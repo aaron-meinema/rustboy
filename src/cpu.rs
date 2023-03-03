@@ -48,7 +48,8 @@ impl Cpu {
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
             0x40..= 0x7f => self.ldrr(opcode),
-            0x80..= 0x8f => self.add(opcode),
+            0x80..= 0x87 => self.add(opcode),
+            0x88..= 0x8f => self.adc(opcode),
             _ => self.default(opcode),
 
         }
@@ -80,6 +81,18 @@ impl Cpu {
         self.cycle_counter += 1;
     }
 
+    fn adc(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        let value_overflow = self.a.overflowing_add(value_from_reg + self.get_c_value());
+        self.set_flag_z(value_overflow.0);
+        self.set_flag_n(false);
+        self.set_flag_h(self.a, value_from_reg);
+        self.set_flag_c(value_overflow.1);
+        self.a = value_overflow.0;
+        self.memory_counter += 1;
+        self.cycle_counter += 1;
+    }
     fn set_flag_z(&mut self, result: u8) {
         if result == 0 {
             self.f |= 0x80;
@@ -134,6 +147,10 @@ impl Cpu {
     fn get_flag_c(&self) -> bool {
         let num = self.f & 0x10;
         return num == 0x10;
+    }
+
+    fn get_c_value(&self) -> u8 {
+        self.f & 0x10
     }
 
     fn default(&mut self, byte: u8) {
@@ -283,6 +300,17 @@ mod tests {
         assert_eq!(cpu.get_flag_c(), true);
         Ok(())
     }
+
+    #[test]
+    fn test_adc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.f = 0xf0;
+        cpu.run_opcode(0x88);      // add b to a with carry
+        assert_eq!(cpu.a, 0x18);
+        assert_eq!(cpu.get_flag_c(), false);
+        Ok(())
+    }
+
 
 
 }
