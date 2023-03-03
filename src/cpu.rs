@@ -1,5 +1,6 @@
+#[warn(unused_imports)]
 use crate::cardridge::{Cardridge, self};
-
+use crate::memory_map::Memory_Map;
 pub struct Cpu {
     b: u8,  // 000
     c: u8,  // 001
@@ -12,7 +13,7 @@ pub struct Cpu {
     f: u8,
     cycle_counter: u16,
     memory_counter: usize,
-    cardridge: Cardridge
+    memory_map: Memory_Map
 }
 const CPU_FIRST: u8  = 0b0000_0111;
 const CPU_SECOND: u8 = 0b0011_1000;
@@ -30,17 +31,17 @@ impl Cpu {
             f: 0,
             memory_counter: 0,
             cycle_counter: 0,
-            cardridge: the_cardridge
+            memory_map: Memory_Map::new(the_cardridge),
         };
         cpu
     }
 
     pub fn start_cycle(&mut self) {
         loop {
-            if self.memory_counter >= self.cardridge.memory.len().try_into().unwrap() {
+            if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
                 return
             }
-            let number = self.cardridge.memory.get(self.memory_counter).unwrap();
+            let number = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
             self.run_opcode(*number);
         }
     }
@@ -211,7 +212,7 @@ mod tests {
             f: 0,
             cycle_counter: 0,
             memory_counter: 0,
-            cardridge: cardridge
+            memory_map: Memory_Map::new(cardridge)
         }
     }
     #[test]
