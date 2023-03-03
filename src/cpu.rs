@@ -150,7 +150,10 @@ impl Cpu {
     }
 
     fn get_c_value(&self) -> u8 {
-        self.f & 0x10
+        if self.get_flag_c(){
+            return 1
+        }
+        0
     }
 
     fn default(&mut self, byte: u8) {
@@ -306,7 +309,7 @@ mod tests {
         let mut cpu = get_cpu();
         cpu.f = 0xf0;
         cpu.run_opcode(0x88);      // add b to a with carry
-        assert_eq!(cpu.a, 0x18);
+        assert_eq!(cpu.a, 9);
         assert_eq!(cpu.get_flag_c(), false);
         Ok(())
     }
