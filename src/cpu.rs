@@ -9,7 +9,8 @@ pub struct Cpu {
     l: u8,  // 101
     a: u8,  // 111
 
-
+    f: u8,
+    cycle_counter: u16,
     memory_counter: usize,
     cardridge: Cardridge
 }
@@ -26,7 +27,9 @@ impl Cpu {
             l: 0,
             a: 0,
 
+            f: 0,
             memory_counter: 0,
+            cycle_counter: 0,
             cardridge: the_cardridge
         };
         cpu
@@ -44,7 +47,8 @@ impl Cpu {
 
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
-            0x40..= 0x45 => self.ldrr(opcode),
+            0x40..= 0x7f => self.ldrr(opcode),
+            0x80..= 0x8f => self.add(opcode),
             _ => self.default(opcode),
 
         }
@@ -60,11 +64,82 @@ impl Cpu {
         let value = self.get_value_from_register(first);
         self.store_value_into_register(second, value);
         self.memory_counter += 1;
+        self.cycle_counter += 1;
+    }
+
+    fn add(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        let value_overflow = self.a.overflowing_add(value_from_reg);
+        self.set_flag_z(value_overflow.0);
+        self.set_flag_n(false);
+        self.set_flag_h(self.a, value_from_reg);
+        self.set_flag_c(value_overflow.1);
+        self.a = value_overflow.0;
+        self.memory_counter += 1;
+        self.cycle_counter += 1;
+    }
+
+    fn set_flag_z(&mut self, result: u8) {
+        if result == 0 {
+            self.f |= 0x80;
+        }
+        else {
+            self.f &= 0x7f;
+        }
+    }
+
+    fn set_flag_n(&mut self, set: bool) {
+        if set {
+            self.f |= 0x40;
+        }
+        else {
+            self.f &= 0xbf;
+        }
+    }
+
+    fn set_flag_h(&mut self, first: u8, second: u8) {
+        if (((first & 0xf) + (second & 0xf)) & 0x10) == 0x10 {
+            self.f |= 0x20;
+        }
+        else {
+            self.f &= 0xdf;
+        }
+    }
+
+    fn set_flag_c(&mut self, set: bool) {
+        if set {
+            self.f |= 0x10;
+        }
+        else {
+            self.f &= 0xef;
+        }
+    }
+
+    fn get_flag_z(&self) -> bool {
+        let num = self.f & 0x80;
+        return num == 0x80;
+    }
+
+    fn get_flag_n(&self) -> bool {
+        let num = self.f & 0x40;
+        return num == 0x40;
+    }
+
+    fn get_flag_h(&self) -> bool {
+        let num = self.f & 0x20;
+        return num == 0x20;
+    }
+
+    fn get_flag_c(&self) -> bool {
+        let num = self.f & 0x10;
+        return num == 0x10;
     }
 
     fn default(&mut self, byte: u8) {
         self.a = byte;
         self.memory_counter += 1;
+        self.cycle_counter += 1;
     }
 
     fn get_value_from_register(&self, register: u8) -> u8 {
@@ -113,6 +188,8 @@ mod tests {
             l: 6,
             a: 7,
 
+            f: 0,
+            cycle_counter: 0,
             memory_counter: 0,
             cardridge: cardridge
         }
@@ -163,9 +240,49 @@ mod tests {
     #[test]
     fn test_ldrr()-> Result<(), String> {
         let mut cpu = get_cpu();
-        cpu.ldrr(0x41);
+        cpu.run_opcode(0x41);
         assert_eq!(cpu.b, 2);
         Ok(())
     }
+
+    #[test]
+    fn test_add()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x80);       // add b to a
+        assert_eq!(cpu.a, 8);
+        assert_eq!(cpu.get_flag_z(), false);
+        assert_eq!(cpu.get_flag_n(), false);
+        assert_eq!(cpu.get_flag_h(), false);
+        assert_eq!(cpu.get_flag_c(), false);
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_zero_carry_halfcarry()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.b = 0xff - 6;
+        cpu.run_opcode(0x80);       // add b to a
+        assert_eq!(cpu.a, 0);
+        assert_eq!(cpu.get_flag_z(), true);
+        assert_eq!(cpu.get_flag_n(), false);
+        assert_eq!(cpu.get_flag_h(), true);
+        assert_eq!(cpu.get_flag_c(), true);
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_carry()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.b = 0xf0;
+        cpu.a = 0xf0;
+        cpu.run_opcode(0x80);       // add b to a
+        assert_eq!(cpu.a, cpu.b.overflowing_add(0xf0).0);
+        assert_eq!(cpu.get_flag_z(), false);
+        assert_eq!(cpu.get_flag_n(), false);
+        assert_eq!(cpu.get_flag_h(), false);
+        assert_eq!(cpu.get_flag_c(), true);
+        Ok(())
+    }
+
 
 }
