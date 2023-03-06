@@ -22,12 +22,20 @@ impl MemoryMap {
 
     pub fn get_8bit(&self, memory_location: u8) -> u8 {
         let memory_address = self.get_8bit_address(memory_location);
-        self.memory.get(memory_address).unwrap().clone()
+        self.get_8bit_full_address(memory_address)
+    }
+
+    pub fn get_8bit_full_address(&self, memory_location: usize) -> u8 {
+        self.memory.get(memory_location).unwrap().clone()
     }
 
     pub fn store_8bit(&mut self, memory_location: u8, value: u8) {
         let memory_address = self.get_8bit_address(memory_location);
-        self.memory.insert(memory_address, value);
+        self.store_8bit_full_address(memory_address, value);
+    }
+
+    pub fn store_8bit_full_address(&mut self, memory_location: usize, value: u8) {
+        self.memory.insert(memory_location.into(), value);
     }
 
     fn get_8bit_address(&self, memory_location: u8) -> usize {

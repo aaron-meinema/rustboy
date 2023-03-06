@@ -207,7 +207,7 @@ impl Cpu {
         self.cycle_counter += 1;
     }
 
-    fn get_value_from_register(&self, register: u8) -> u8 {
+    fn get_value_from_register(&mut self, register: u8) -> u8 {
         match register {
             0b000 => self.b,
             0b001 => self.c,
@@ -215,6 +215,7 @@ impl Cpu {
             0b011 => self.e,
             0b100 => self.h,
             0b101 => self.l,
+            0b110 => self.get_memory_hl(),
             0b111 => self.a,
             _ => self.get_value_from_register(register >> 3)
         }
@@ -228,9 +229,28 @@ impl Cpu {
             0b011 => self.e = value,
             0b100 => self.h = value,
             0b101 => self.l = value,
+            0b110 => self.store_hl_memory(value),
             0b111 => self.a = value,
             _ => self.store_value_into_register(value, register >> 3),
         }
+    }
+
+    fn get_memory_hl(&mut self) -> u8 {
+        let hl = self.get_hl();
+        self.memory_map.get_8bit_full_address(hl.into())
+    }
+
+    fn store_hl_memory(&mut self, value: u8) {
+        let hl = self.get_hl();
+        self.memory_map.store_8bit_full_address(hl.into(), value);
+    }
+
+    fn get_hl(&mut self) -> u16 {
+        let mut h:u16 = self.h.into();
+        h = h << 8;
+        let l: u16 = self.l.into();
+        self.cycle_counter += 4;
+        return h + l;
     }
 }
 
@@ -261,7 +281,7 @@ mod tests {
     }
     #[test]
     fn test_get_from_reg() -> Result<(), String> {
-        let cpu = get_cpu();
+        let mut cpu = get_cpu();
         assert_eq!(cpu.get_value_from_register(0b000), 1);
         assert_eq!(cpu.get_value_from_register(0b001), 2);
         assert_eq!(cpu.get_value_from_register(0b010), 3);
@@ -408,4 +428,21 @@ mod tests {
         assert_eq!(cpu.a, 7);
         Ok(())
     }
+
+    #[test]
+    fn test_get_hl()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        assert_eq!(cpu.get_hl(), 0x0506);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_store_hl()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x70);
+        cpu.run_opcode(0x56);
+        assert_eq!(cpu.d, cpu.b);
+        Ok(())
+    }
+
 }
