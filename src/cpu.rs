@@ -1,5 +1,4 @@
-#[warn(unused_imports)]
-use crate::cardridge::{Cardridge, self};
+use crate::cardridge::{Cardridge};
 use crate::memory_map::Memory_Map;
 pub struct Cpu {
     b: u8,  // 000
@@ -48,6 +47,8 @@ impl Cpu {
 
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
+            0xf0         => self.ld_from_memory(),
+            t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
             0x40..= 0x7f => self.ldrr(opcode),
             0x80..= 0x87 => self.add(opcode),
             0x88..= 0x8f => self.adc(opcode),
@@ -60,13 +61,31 @@ impl Cpu {
         self.a
     }
 
+    fn ld_from_memory(&mut self) {
+        self.memory_counter += 1;
+        let location = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        self.a = self.memory_map.get_8bit(location);
+        self.memory_counter += 1;
+        self.cycle_counter += 12;
+    }
+
+    fn ld_from_cardridge(&mut self, opcode: u8) {
+        self.memory_counter += 1;
+        let register = u8::from(opcode & CPU_SECOND);
+        let value = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        self.store_value_into_register(value, register);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+
     fn ldrr(&mut self, opcode: u8) {
         let first = u8::from(opcode & CPU_FIRST);
         let second = u8::from(opcode & CPU_SECOND);
         let value = self.get_value_from_register(first);
-        self.store_value_into_register(second, value);
+        self.store_value_into_register(value, second);
         self.memory_counter += 1;
-        self.cycle_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn add(&mut self, opcode: u8) {
@@ -79,7 +98,7 @@ impl Cpu {
         self.set_flag_c(value_overflow.1);
         self.a = value_overflow.0;
         self.memory_counter += 1;
-        self.cycle_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn adc(&mut self, opcode: u8) {
@@ -92,8 +111,9 @@ impl Cpu {
         self.set_flag_c(value_overflow.1);
         self.a = value_overflow.0;
         self.memory_counter += 1;
-        self.cycle_counter += 1;
+        self.cycle_counter += 4;
     }
+
     fn set_flag_z(&mut self, result: u8) {
         if result == 0 {
             self.f |= 0x80;
@@ -172,11 +192,11 @@ impl Cpu {
             0b100 => self.h,
             0b101 => self.l,
             0b111 => self.a,
-            _ => 8
+            _ => self.get_value_from_register(register >> 3)
         }
     }
 
-    fn store_value_into_register(&mut self, register: u8, value: u8) {
+    fn store_value_into_register(&mut self, value: u8, register: u8) {
         match register {
             0b000 => self.b = value,
             0b001 => self.c = value,
@@ -185,7 +205,7 @@ impl Cpu {
             0b100 => self.h = value,
             0b101 => self.l = value,
             0b111 => self.a = value,
-            _ => self.a = self.a,
+            _ => self.store_value_into_register(value, register >> 3),
         }
     }
 }
@@ -197,7 +217,7 @@ mod tests {
 
     fn get_cpu() -> Cpu {
         let vec1:Vec<u8> = vec![0x40, 0x41, 0x42];
-        let cardridge = cardridge::Cardridge{
+        let cardridge = Cardridge{
             memory: vec1,
         };
         Cpu {
@@ -262,7 +282,9 @@ mod tests {
     fn test_ldrr()-> Result<(), String> {
         let mut cpu = get_cpu();
         cpu.run_opcode(0x41);
+        cpu.run_opcode(0x50);
         assert_eq!(cpu.b, 2);
+        assert_eq!(cpu.d, 2);
         Ok(())
     }
 
@@ -315,6 +337,38 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_ld_from_memory() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0xf0);      // add b to a with carry
+        assert_eq!(cpu.a, 0);
+        Ok(())
+    }
 
+    #[test]
+    fn test_ld_from_cardridge() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x3e);      // add b to a with carry
+        assert_eq!(cpu.a, 65);
+        cpu = get_cpu();
+        cpu.run_opcode(0x06);
+        assert_eq!(cpu.b, 65);
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_ld_to_and_from_memory() -> Result<(), String> {
+        let vec1:Vec<u8> = vec![0x40, 0x41, 0x42];
+        let cardridge = Cardridge{
+            memory: vec1,
+        };
+        let mut cpu = get_cpu();
+        cpu.memory_map = Memory_Map::new(cardridge);
+        cpu.run_opcode(0x88);      // add b to a with carry
+        assert_eq!(cpu.a, 9);
+        assert_eq!(cpu.get_flag_c(), false);
+        Ok(())
+    }
 
 }

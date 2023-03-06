@@ -8,7 +8,7 @@ pub struct Memory_Map {
 impl Memory_Map {
     pub fn new(the_cardridge: Cardridge) -> Memory_Map {
         let mut mem = Vec::new();
-        for n in 0..0xffff {
+        for _ in 0..0xffff {
             mem.push(0);
         }
 
