@@ -1,18 +1,18 @@
 use crate::cardridge::Cardridge;
 
-pub struct Memory_Map {
+pub struct MemoryMap {
     pub cardridge: Cardridge,
     memory: Vec<u8>,
 }
 
-impl Memory_Map {
-    pub fn new(the_cardridge: Cardridge) -> Memory_Map {
+impl MemoryMap {
+    pub fn new(the_cardridge: Cardridge) -> MemoryMap {
         let mut mem = Vec::new();
         for _ in 0..0xffff {
             mem.push(0);
         }
 
-        let memory_map = Memory_Map {
+        let memory_map = MemoryMap {
             cardridge: the_cardridge,
             memory: mem,
         };

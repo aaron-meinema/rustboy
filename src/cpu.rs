@@ -1,5 +1,5 @@
 use crate::cardridge::{Cardridge};
-use crate::memory_map::Memory_Map;
+use crate::memory_map::MemoryMap;
 pub struct Cpu {
     b: u8,  // 000
     c: u8,  // 001
@@ -12,7 +12,7 @@ pub struct Cpu {
     f: u8,
     cycle_counter: u16,
     memory_counter: usize,
-    memory_map: Memory_Map
+    memory_map: MemoryMap
 }
 const CPU_FIRST: u8  = 0b0000_0111;
 const CPU_SECOND: u8 = 0b0011_1000;
@@ -30,7 +30,7 @@ impl Cpu {
             f: 0,
             memory_counter: 0,
             cycle_counter: 0,
-            memory_map: Memory_Map::new(the_cardridge),
+            memory_map: MemoryMap::new(the_cardridge),
         };
         cpu
     }
@@ -256,7 +256,7 @@ mod tests {
             f: 0,
             cycle_counter: 0,
             memory_counter: 0,
-            memory_map: Memory_Map::new(cardridge)
+            memory_map: MemoryMap::new(cardridge)
         }
     }
     #[test]
@@ -390,7 +390,7 @@ mod tests {
             memory: vec1,
         };
         let mut cpu = get_cpu();
-        cpu.memory_map = Memory_Map::new(cardridge);
+        cpu.memory_map = MemoryMap::new(cardridge);
         cpu.run_opcode(0xe0);      // add b to a with carry
         cpu.a = 0xff;
         cpu.run_opcode(0xf0);
