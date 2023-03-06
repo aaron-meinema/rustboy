@@ -48,7 +48,9 @@ impl Cpu {
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
             0xf0         => self.ld_from_memory(),
+            0xf2         => self.ld_from_memory_c(),
             0xe0         => self.ld_to_memory(),
+            0xe2         => self.ld_to_memory_c(),
             t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
             0x40..= 0x7f => self.ldrr(opcode),
             0x80..= 0x87 => self.add(opcode),
@@ -68,8 +70,14 @@ impl Cpu {
         self.memory_map.store_8bit(location, self.a);
         self.memory_counter += 1;
         self.cycle_counter += 12;
-
     }
+
+    fn ld_to_memory_c(&mut self) {
+        self.memory_map.store_8bit(self.c, self.a);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
 
     fn ld_from_memory(&mut self) {
         self.memory_counter += 1;
@@ -77,6 +85,12 @@ impl Cpu {
         self.a = self.memory_map.get_8bit(location);
         self.memory_counter += 1;
         self.cycle_counter += 12;
+    }
+
+    fn ld_from_memory_c(&mut self) {
+        self.a = self.memory_map.get_8bit(self.c);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
     }
 
     fn ld_from_cardridge(&mut self, opcode: u8) {
@@ -355,6 +369,8 @@ mod tests {
         Ok(())
     }
 
+
+
     #[test]
     fn test_ld_from_cardridge() -> Result<(), String> {
         let mut cpu = get_cpu();
@@ -382,4 +398,14 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_ld_to_and_from_memory_c() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.c = 0x99;
+        cpu.run_opcode(0xe2);      // add b to a with carry
+        cpu.a = 0xff;
+        cpu.run_opcode(0xf2);
+        assert_eq!(cpu.a, 7);
+        Ok(())
+    }
 }
