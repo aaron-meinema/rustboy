@@ -2,15 +2,12 @@ use crate::cardridge::Cardridge;
 
 pub struct MemoryMap {
     pub cardridge: Cardridge,
-    memory: Vec<u8>,
+    memory: [u8; 0x10000],
 }
 
 impl MemoryMap {
     pub fn new(the_cardridge: Cardridge) -> MemoryMap {
-        let mut mem = Vec::new();
-        for _ in 0..0xffff {
-            mem.push(0);
-        }
+        let mem: [u8; 0x10000] = [0; 0x10000];
 
         let memory_map = MemoryMap {
             cardridge: the_cardridge,
@@ -26,6 +23,9 @@ impl MemoryMap {
     }
 
     pub fn get_8bit_full_address(&self, memory_location: usize) -> u8 {
+        for x in 0x0500..0x0510 {
+            println!("location: {:x} has the value: {}",x, self.memory.get(x).unwrap());
+        }
         self.memory.get(memory_location).unwrap().clone()
     }
 
@@ -35,7 +35,7 @@ impl MemoryMap {
     }
 
     pub fn store_8bit_full_address(&mut self, memory_location: usize, value: u8) {
-        self.memory.insert(memory_location.into(), value);
+        self.memory[memory_location] = value;
     }
 
     fn get_8bit_address(&self, memory_location: u8) -> usize {

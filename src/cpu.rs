@@ -47,6 +47,10 @@ impl Cpu {
 
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
+            0x02         => self.ldbca(),
+            0x12         => self.lddea(),
+            0x22         => self.ldhlp(),
+            0x32         => self.ldhlm(),
             0xf0         => self.ld_from_memory(),
             0xf2         => self.ld_from_memory_c(),
             0xe0         => self.ld_to_memory(),
@@ -62,6 +66,42 @@ impl Cpu {
 
     pub fn a(&self) -> u8 {
         self.a
+    }
+
+    fn ldhlm(&mut self) {
+        if self.l == 0x00 {
+            self.l = 0xff;
+            self.h -= 1;
+        }
+        else {
+            self.l -= 1;
+        }
+        let location = self.get_hl();
+        self.memory_map.store_8bit_full_address(location.into(), self.a);
+    }
+
+    fn ldhlp(&mut self) {
+        if self.l == 0xff {
+            self.l = 0x00;
+            self.h += 1;
+        }
+        else {
+            self.l += 1;
+        }
+        let location = self.get_hl();
+        self.memory_map.store_8bit_full_address(location.into(), self.a);
+    }
+
+    fn ldbca(&mut self) {
+        let location = self.get_bc();
+        self.memory_map.store_8bit_full_address(location.into(), self.a);
+        self.cycle_counter += 4;
+    }
+
+    fn lddea(&mut self) {
+        let location = self.get_de();
+        self.memory_map.store_8bit_full_address(location.into(), self.a);
+        self.cycle_counter += 4;
     }
 
     fn ld_to_memory(&mut self) {
@@ -243,6 +283,24 @@ impl Cpu {
     fn store_hl_memory(&mut self, value: u8) {
         let hl = self.get_hl();
         self.memory_map.store_8bit_full_address(hl.into(), value);
+    }
+
+    fn get_bc(&mut self) -> u16 {
+        let mut b:u16 = self.b.into();
+        b = b << 8;
+        let c: u16 = self.c.into();
+        self.cycle_counter += 4;
+        return b + c;
+
+    }
+
+    fn get_de(&mut self) -> u16 {
+        let mut d:u16 = self.d.into();
+        d = d << 8;
+        let e: u16 = self.e.into();
+        self.cycle_counter += 4;
+        return d + e;
+
     }
 
     fn get_hl(&mut self) -> u16 {
@@ -444,5 +502,23 @@ mod tests {
         assert_eq!(cpu.d, cpu.b);
         Ok(())
     }
+
+    #[test]
+    fn test_multiple_ld_to_memory()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x02);
+        cpu.run_opcode(0x12);
+        cpu.run_opcode(0x22);
+        cpu.run_opcode(0x32);
+
+
+        assert_eq!(cpu.memory_map.get_8bit_full_address(0x0102), cpu.a);
+        assert_eq!(cpu.memory_map.get_8bit_full_address(0x0304), cpu.a);
+        assert_eq!(cpu.memory_map.get_8bit_full_address(0x0507), cpu.a);
+        assert_eq!(cpu.memory_map.get_8bit_full_address(0x0506), cpu.a);
+        assert_eq!(cpu.memory_map.get_8bit_full_address(0xffff), 0);
+        Ok(())
+    }
+
 
 }
