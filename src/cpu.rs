@@ -48,6 +48,7 @@ impl Cpu {
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
             0xf0         => self.ld_from_memory(),
+            0xe0         => self.ld_to_memory(),
             t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
             0x40..= 0x7f => self.ldrr(opcode),
             0x80..= 0x87 => self.add(opcode),
@@ -59,6 +60,15 @@ impl Cpu {
 
     pub fn a(&self) -> u8 {
         self.a
+    }
+
+    fn ld_to_memory(&mut self) {
+        self.memory_counter += 1;
+        let location = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        self.memory_map.store_8bit(location, self.a);
+        self.memory_counter += 1;
+        self.cycle_counter += 12;
+
     }
 
     fn ld_from_memory(&mut self) {
@@ -251,13 +261,13 @@ mod tests {
     #[test]
     fn test_store_in_reg()-> Result<(), String> {
         let mut cpu = get_cpu();
-        cpu.store_value_into_register(0b000, 8);
-        cpu.store_value_into_register(0b001, 9);
-        cpu.store_value_into_register(0b010, 10);
-        cpu.store_value_into_register(0b011, 11);
-        cpu.store_value_into_register(0b100, 12);
-        cpu.store_value_into_register(0b101, 13);
-        cpu.store_value_into_register(0b111, 14);
+        cpu.store_value_into_register(8,0b000);
+        cpu.store_value_into_register(9,0b001);
+        cpu.store_value_into_register(10,0b010);
+        cpu.store_value_into_register(11,0b011);
+        cpu.store_value_into_register(12,0b100);
+        cpu.store_value_into_register(13,0b101);
+        cpu.store_value_into_register(14,0b111);
 
 
         assert_eq!(cpu.get_value_from_register(0b000), 8);
@@ -359,15 +369,16 @@ mod tests {
 
     #[test]
     fn test_ld_to_and_from_memory() -> Result<(), String> {
-        let vec1:Vec<u8> = vec![0x40, 0x41, 0x42];
+        let vec1:Vec<u8> = vec![0xe0, 0x80, 0xf0, 0x80];
         let cardridge = Cardridge{
             memory: vec1,
         };
         let mut cpu = get_cpu();
         cpu.memory_map = Memory_Map::new(cardridge);
-        cpu.run_opcode(0x88);      // add b to a with carry
-        assert_eq!(cpu.a, 9);
-        assert_eq!(cpu.get_flag_c(), false);
+        cpu.run_opcode(0xe0);      // add b to a with carry
+        cpu.a = 0xff;
+        cpu.run_opcode(0xf0);
+        assert_eq!(cpu.a, 7);
         Ok(())
     }
 
