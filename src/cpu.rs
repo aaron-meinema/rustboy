@@ -51,6 +51,10 @@ impl Cpu {
             0x12         => self.lddea(),
             0x22         => self.ldhlp(),
             0x32         => self.ldhlm(),
+            0x0a         => self.ldabc(),
+            0x1a         => self.ldade(),
+            0x2a         => self.ldahlp(),
+            0x3a         => self.ldahlm(),
             0xf0         => self.ld_from_memory(),
             0xf2         => self.ld_from_memory_c(),
             0xe0         => self.ld_to_memory(),
@@ -78,6 +82,7 @@ impl Cpu {
         }
         let location = self.get_hl();
         self.memory_map.store_8bit_full_address(location.into(), self.a);
+        self.cycle_counter += 4;
     }
 
     fn ldhlp(&mut self) {
@@ -90,6 +95,7 @@ impl Cpu {
         }
         let location = self.get_hl();
         self.memory_map.store_8bit_full_address(location.into(), self.a);
+        self.cycle_counter += 4;
     }
 
     fn ldbca(&mut self) {
@@ -97,6 +103,45 @@ impl Cpu {
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
     }
+
+    fn ldabc(&mut self) {
+        let location = self.get_bc();
+        self.a = self.memory_map.get_8bit_full_address(location.into());
+        self.cycle_counter += 4;
+    }
+
+    fn ldade(&mut self) {
+        let location = self.get_de();
+        self.a = self.memory_map.get_8bit_full_address(location.into());
+        self.cycle_counter += 4;
+    }
+
+    fn ldahlp(&mut self) {
+        if self.l == 0xff {
+            self.l = 0x00;
+            self.h += 1;
+        }
+        else {
+            self.l += 1;
+        }
+        let location = self.get_hl();
+        self.a = self.memory_map.get_8bit_full_address(location.into());
+        self.cycle_counter += 4;
+    }
+
+    fn ldahlm(&mut self) {
+        if self.l == 0x00 {
+            self.l = 0xff;
+            self.h -= 1;
+        }
+        else {
+            self.l -= 1;
+        }
+        let location = self.get_hl();
+        self.a = self.memory_map.get_8bit_full_address(location.into());
+        self.cycle_counter += 4;
+    }
+
 
     fn lddea(&mut self) {
         let location = self.get_de();
@@ -519,6 +564,36 @@ mod tests {
         assert_eq!(cpu.memory_map.get_8bit_full_address(0xffff), 0);
         Ok(())
     }
+
+    #[test]
+    fn test_multiple_from_memory()-> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.memory_map.store_8bit_full_address(0x0102, 10);
+        cpu.memory_map.store_8bit_full_address(0x0304, 20);
+        cpu.memory_map.store_8bit_full_address(0x0507, 30);
+        cpu.memory_map.store_8bit_full_address(0x0506, 40);
+
+
+        cpu.run_opcode(0x0a);
+        assert_eq!(cpu.a, 10);
+        cpu.run_opcode(0x1a);
+        assert_eq!(cpu.a, 20);
+        cpu.run_opcode(0x2a);
+        assert_eq!(cpu.a, 30);
+        cpu.run_opcode(0x3a);
+        assert_eq!(cpu.a, 40);
+        cpu.b = 0xff;
+        cpu.c = 0xff;
+        cpu.run_opcode(0x0a);
+        assert_eq!(cpu.a, 0);
+        cpu.l = 0xff;
+        cpu.run_opcode(0x2a);
+        assert_eq!(cpu.get_hl(), 0x0600);
+        cpu.run_opcode(0x3a);
+        assert_eq!(cpu.get_hl(), 0x05ff);
+        Ok(())
+    }
+
 
 
 }
