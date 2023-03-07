@@ -83,6 +83,7 @@ impl Cpu {
         let location = self.get_hl();
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ldhlp(&mut self) {
@@ -96,24 +97,28 @@ impl Cpu {
         let location = self.get_hl();
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ldbca(&mut self) {
         let location = self.get_bc();
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ldabc(&mut self) {
         let location = self.get_bc();
         self.a = self.memory_map.get_8bit_full_address(location.into());
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ldade(&mut self) {
         let location = self.get_de();
         self.a = self.memory_map.get_8bit_full_address(location.into());
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ldahlp(&mut self) {
@@ -127,6 +132,7 @@ impl Cpu {
         let location = self.get_hl();
         self.a = self.memory_map.get_8bit_full_address(location.into());
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ldahlm(&mut self) {
@@ -140,6 +146,7 @@ impl Cpu {
         let location = self.get_hl();
         self.a = self.memory_map.get_8bit_full_address(location.into());
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
 
@@ -147,6 +154,7 @@ impl Cpu {
         let location = self.get_de();
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
+        self.memory_counter += 1;
     }
 
     fn ld_to_memory(&mut self) {
