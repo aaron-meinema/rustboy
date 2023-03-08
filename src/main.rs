@@ -10,5 +10,4 @@ fn main() {
     let mut cpu = cpu::Cpu::new(cardridge);
     
     cpu.start_cycle();
-    println!("{}", cpu.a());
 }

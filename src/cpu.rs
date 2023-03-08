@@ -55,6 +55,8 @@ impl Cpu {
             0x1a         => self.ldade(),
             0x2a         => self.ldahlp(),
             0x3a         => self.ldahlm(),
+            0xea         => self.ld_a16_a(),
+            0xfa         => self.ld_a_a16(),
             0xf0         => self.ld_from_memory(),
             0xf2         => self.ld_from_memory_c(),
             0xe0         => self.ld_to_memory(),
@@ -68,8 +70,26 @@ impl Cpu {
         }
     }
 
-    pub fn a(&self) -> u8 {
-        self.a
+    fn ld_a16_a(&mut self) {
+        self.memory_counter += 1;
+        let mut high: u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        self.memory_counter += 1;
+        let low:u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        high = high << 8;
+        self.memory_map.store_8bit_full_address((high + low).into(), self.a);
+        self.memory_counter += 1;
+        self.cycle_counter += 16;
+    }
+
+    fn ld_a_a16(&mut self) {
+        self.memory_counter += 1;
+        let mut high: u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        self.memory_counter += 1;
+        let low:u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        high = high << 8;
+        self.a = self.memory_map.get_8bit_full_address((high + low).into());
+        self.memory_counter += 1;
+        self.cycle_counter += 16;
     }
 
     fn ldhlm(&mut self) {
@@ -599,6 +619,23 @@ mod tests {
         assert_eq!(cpu.get_hl(), 0x0600);
         cpu.run_opcode(0x3a);
         assert_eq!(cpu.get_hl(), 0x05ff);
+        Ok(())
+    }
+
+    #[test]
+    fn test_ld_to_and_from_a16()-> Result<(), String> {
+        let vec1:Vec<u8> = vec![0xea, 0xff, 0x80, 0xfe, 0xff, 0x80];
+        let cardridge = Cardridge{
+            memory: vec1,
+        };
+
+        let mut cpu = get_cpu();
+        cpu.memory_map.cardridge = cardridge;
+        cpu.run_opcode(0xea);
+        cpu.a = 0xff;
+        cpu.run_opcode(0xfa);
+        assert_eq!(cpu.a, 7);
+        assert_eq!(cpu.memory_map.get_8bit(0x80), cpu.a);
         Ok(())
     }
 
