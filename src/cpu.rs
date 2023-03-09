@@ -72,7 +72,9 @@ impl Cpu {
             0xa0..= 0xa7 => self.and(opcode),
             0xa8..= 0xaf => self.xor(opcode),
             0xb0..= 0xb7 => self.or(opcode),
+            0xb8..= 0xbf => self.cp(opcode),
             t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
+            t if t & 0xc7 == 0x04 => self.inc(opcode),
             _ => self.default(opcode),
 
         }
@@ -112,7 +114,6 @@ impl Cpu {
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
         self.memory_counter += 1;
-
     }
 
     fn ldhlp(&mut self) {
@@ -224,7 +225,6 @@ impl Cpu {
         self.cycle_counter += 8;
     }
 
-
     fn ldrr(&mut self, opcode: u8) {
         let first = u8::from(opcode & CPU_FIRST);
         let second = u8::from(opcode & CPU_SECOND);
@@ -309,6 +309,30 @@ impl Cpu {
         self.a = self.a | value_from_reg;
         self.f = 0x20;
         self.set_flag_z(self.a);
+    }
+
+    fn cp(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        let value_overflow = self.a.overflowing_sub(value_from_reg);
+        self.set_flag_z(value_overflow.0);
+        self.set_flag_n(true);
+        self.set_flag_h_neg(self.a, value_from_reg);
+        self.set_flag_c(value_overflow.1);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
+    fn inc(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_SECOND);
+        let value = self.get_value_from_register(register);
+        let overflow = value.overflowing_add(1);
+        self.set_flag_z(overflow.0);
+        self.set_flag_n(false);
+        self.set_flag_h_pos(value, 1);
+        self.store_value_into_register(overflow.0, register);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn set_flag_z(&mut self, result: u8) {
@@ -420,11 +444,13 @@ impl Cpu {
 
     fn get_memory_hl(&mut self) -> u8 {
         let hl = self.get_hl();
+        self.cycle_counter += 4;
         self.memory_map.get_8bit_full_address(hl.into())
     }
 
     fn store_hl_memory(&mut self, value: u8) {
         let hl = self.get_hl();
+        self.cycle_counter += 4;
         self.memory_map.store_8bit_full_address(hl.into(), value);
     }
 
@@ -761,6 +787,18 @@ mod tests {
         assert_eq!(cpu.a, 0xdd);
         Ok(())
     }
+
+    #[test]
+    fn test_inc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x04);
+        assert_eq!(cpu.b, 0x2);
+        cpu.a = 0xf;
+        cpu.run_opcode(0x3c);
+        assert!(cpu.get_flag_h());
+        Ok(())
+    }
+
 
 
 }
