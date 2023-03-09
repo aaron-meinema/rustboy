@@ -53,6 +53,7 @@ impl Cpu {
             0x02         => self.ldbca(),
             0x12         => self.lddea(),
             0x22         => self.ldhlp(),
+            0x27         => self.daa(),
             0x32         => self.ldhlm(),
             0x0a         => self.ldabc(),
             0x1a         => self.ldade(),
@@ -348,6 +349,36 @@ impl Cpu {
         self.cycle_counter += 4;
     }
 
+    fn daa(&mut self) {
+        let mut overflow = false;
+        if self.get_flag_n() {
+            if self.get_flag_h() {
+                let result = self.a.overflowing_sub(0x6);
+                self.a = result.0;
+            }
+
+            if self.get_flag_c() {
+                let result = self.a.overflowing_sub(0x60);
+                self.a = result.0;
+            }
+        }
+        else {
+            if self.get_flag_h() || self.a & 0xf > 0x9 {
+                let result = self.a.overflowing_add(0x6);
+                self.a = result.0;
+                overflow |= result.1;
+            }
+
+            if self.get_flag_c() || self.a > 0x9f {
+                let result = self.a.overflowing_add(0x60);
+                self.a = result.0;
+                overflow |= result.1;
+            }
+        }
+        self.set_flag_z(self.a);
+        self.set_flag_c(overflow);
+        self.set_flag_h(false);
+    }
 
     fn set_flag_z(&mut self, result: u8) {
         if result == 0 {
@@ -379,6 +410,15 @@ impl Cpu {
     fn set_flag_h_neg(&mut self, first: u8, second: u8) {
         let value = (first &0xf).overflowing_sub(second & 0xf);
         if value.1 {
+            self.f |= 0x20;
+        }
+        else {
+            self.f &= 0xdf;
+        }
+    }
+
+    fn set_flag_h(&mut self, set: bool){
+        if set {
             self.f |= 0x20;
         }
         else {
@@ -821,6 +861,28 @@ mod tests {
         cpu.a = 0x10;
         cpu.run_opcode(0x3d);
         assert!(cpu.get_flag_h());
+        Ok(())
+    }
+
+    #[test]
+    fn test_daa() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        //cpu.f = 0xd0;
+        cpu.a = 0x7e;
+        cpu.daa();
+        assert_eq!(cpu.a, 0x84);
+        assert!(!cpu.get_flag_c());
+        cpu.f = 0xf0;
+        cpu.a = 0x89;
+        cpu.daa();
+        assert_eq!(cpu.a, 0x23);
+        cpu.f = 0xf0;
+        cpu.a = 0x83;
+        cpu.daa();
+        assert_eq!(cpu.a, 0x1d);
+        cpu.daa();
+        assert_eq!(cpu.a, 0x1d);
+
         Ok(())
     }
 
