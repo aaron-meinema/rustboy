@@ -64,7 +64,6 @@ impl Cpu {
             0xf2         => self.ld_from_memory_c(),
             0xe0         => self.ld_to_memory(),
             0xe2         => self.ld_to_memory_c(),
-            t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
             0x40..= 0x7f => self.ldrr(opcode),
             0x80..= 0x87 => self.add(opcode),
             0x88..= 0x8f => self.adc(opcode),
@@ -73,6 +72,7 @@ impl Cpu {
             0xa0..= 0xa7 => self.and(opcode),
             0xa8..= 0xaf => self.xor(opcode),
             0xb0..= 0xb7 => self.or(opcode),
+            t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
             _ => self.default(opcode),
 
         }
@@ -112,6 +112,7 @@ impl Cpu {
         self.memory_map.store_8bit_full_address(location.into(), self.a);
         self.cycle_counter += 4;
         self.memory_counter += 1;
+
     }
 
     fn ldhlp(&mut self) {
