@@ -1,5 +1,6 @@
-use crate::cardridge::{Cardridge};
+use crate::cardridge::Cardridge;
 use crate::memory_map::MemoryMap;
+
 pub struct Cpu {
     b: u8,  // 000
     c: u8,  // 001
@@ -14,8 +15,10 @@ pub struct Cpu {
     memory_counter: usize,
     memory_map: MemoryMap
 }
+
 const CPU_FIRST: u8  = 0b0000_0111;
 const CPU_SECOND: u8 = 0b0011_1000;
+
 impl Cpu {
     pub fn new(the_cardridge: Cardridge) -> Cpu {
         let cpu = Cpu {
@@ -65,6 +68,11 @@ impl Cpu {
             0x40..= 0x7f => self.ldrr(opcode),
             0x80..= 0x87 => self.add(opcode),
             0x88..= 0x8f => self.adc(opcode),
+            0x90..= 0x97 => self.sub(opcode),
+            0x98..= 0x9f => self.sbc(opcode),
+            0xa0..= 0xa7 => self.and(opcode),
+            0xa8..= 0xaf => self.xor(opcode),
+            0xb0..= 0xb7 => self.or(opcode),
             _ => self.default(opcode),
 
         }
@@ -225,13 +233,39 @@ impl Cpu {
         self.cycle_counter += 4;
     }
 
+    fn sub(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        let value_overflow = self.a.overflowing_sub(value_from_reg);
+        self.set_flag_z(value_overflow.0);
+        self.set_flag_n(true);
+        self.set_flag_h_neg(self.a, value_from_reg);
+        self.set_flag_c(value_overflow.1);
+        self.a = value_overflow.0;
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
+    fn sbc(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        let value_overflow = self.a.overflowing_sub(value_from_reg + self.get_c_value());
+        self.set_flag_z(value_overflow.0);
+        self.set_flag_n(true);
+        self.set_flag_h_neg(self.a, value_from_reg);
+        self.set_flag_c(value_overflow.1);
+        self.a = value_overflow.0;
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
     fn add(&mut self, opcode: u8) {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_add(value_from_reg);
         self.set_flag_z(value_overflow.0);
         self.set_flag_n(false);
-        self.set_flag_h(self.a, value_from_reg);
+        self.set_flag_h_pos(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
         self.a = value_overflow.0;
         self.memory_counter += 1;
@@ -244,11 +278,36 @@ impl Cpu {
         let value_overflow = self.a.overflowing_add(value_from_reg + self.get_c_value());
         self.set_flag_z(value_overflow.0);
         self.set_flag_n(false);
-        self.set_flag_h(self.a, value_from_reg);
+        self.set_flag_h_pos(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
         self.a = value_overflow.0;
         self.memory_counter += 1;
         self.cycle_counter += 4;
+    }
+
+    fn and(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        self.a = self.a & value_from_reg;
+
+        self.f = 0x20;
+        self.set_flag_z(self.a);
+    }
+
+    fn xor(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        self.a = self.a ^ value_from_reg;
+        self.f = 0;
+        self.set_flag_z(self.a);
+    }
+
+    fn or(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_FIRST);
+        let value_from_reg = self.get_value_from_register(register);
+        self.a = self.a | value_from_reg;
+        self.f = 0x20;
+        self.set_flag_z(self.a);
     }
 
     fn set_flag_z(&mut self, result: u8) {
@@ -269,8 +328,18 @@ impl Cpu {
         }
     }
 
-    fn set_flag_h(&mut self, first: u8, second: u8) {
+    fn set_flag_h_pos(&mut self, first: u8, second: u8) {
         if (((first & 0xf) + (second & 0xf)) & 0x10) == 0x10 {
+            self.f |= 0x20;
+        }
+        else {
+            self.f &= 0xdf;
+        }
+    }
+
+    fn set_flag_h_neg(&mut self, first: u8, second: u8) {
+        let value = (first &0xf).overflowing_sub(second & 0xf);
+        if value.1 {
             self.f |= 0x20;
         }
         else {
@@ -639,6 +708,58 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_h_flag() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a = 0xf8;
+        cpu.b = 0x8;
+        cpu.run_opcode(0x80);
+        assert!(cpu.get_flag_h());
+        Ok(())
+    }
+
+    #[test]
+    fn test_h_flag_and_sub() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a = 0xf8;
+        cpu.b = 0x9;
+        cpu.run_opcode(0x90);
+        assert!(cpu.get_flag_h());
+        assert_eq!(cpu.a, 0xef);
+        cpu.run_opcode(0x90);
+        assert!(!cpu.get_flag_h());
+        assert_eq!(cpu.a, 0xe6);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sbc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a = 0x8;
+        cpu.b = 0x9;
+        cpu.run_opcode(0x90);
+        assert_eq!(cpu.a, 0xff);
+        cpu.run_opcode(0x98);
+        assert!(!cpu.get_flag_h());
+        assert_eq!(cpu.a, 0xff-0xa);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_and_xor_or() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a = 0xfe;
+        cpu.b = 0xdd;
+        cpu.run_opcode(0xa0);
+        assert_eq!(cpu.a, 0xdc);
+        cpu.run_opcode(0xa8);
+        assert_eq!(cpu.a, 0x01);
+        cpu.run_opcode(0xb0);
+        assert_eq!(cpu.a, 0xdd);
+        Ok(())
+    }
 
 
 }
