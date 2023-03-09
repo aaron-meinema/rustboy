@@ -877,12 +877,11 @@ mod tests {
         cpu.daa();
         assert_eq!(cpu.a, 0x23);
         cpu.f = 0xf0;
-        cpu.a = 0x83;
+        cpu.a = 0x90;
+        cpu.b = 0x09;
+        cpu.run_opcode(0x90);
         cpu.daa();
-        assert_eq!(cpu.a, 0x1d);
-        cpu.daa();
-        assert_eq!(cpu.a, 0x1d);
-
+        assert_eq!(cpu.a, 0x81);
         Ok(())
     }
 
