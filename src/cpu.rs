@@ -75,6 +75,7 @@ impl Cpu {
             0xb8..= 0xbf => self.cp(opcode),
             t if t & 0xc7 == 0x06 => self.ld_from_cardridge(opcode),
             t if t & 0xc7 == 0x04 => self.inc(opcode),
+            t if t & 0xc7 == 0x05 => self.dec(opcode),
             _ => self.default(opcode),
 
         }
@@ -334,6 +335,19 @@ impl Cpu {
         self.memory_counter += 1;
         self.cycle_counter += 4;
     }
+
+    fn dec(&mut self, opcode: u8) {
+        let register = u8::from(opcode & CPU_SECOND);
+        let value = self.get_value_from_register(register);
+        let overflow = value.overflowing_sub(1);
+        self.set_flag_z(overflow.0);
+        self.set_flag_n(true);
+        self.set_flag_h_neg(value, 1);
+        self.store_value_into_register(overflow.0, register);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
 
     fn set_flag_z(&mut self, result: u8) {
         if result == 0 {
@@ -795,6 +809,17 @@ mod tests {
         assert_eq!(cpu.b, 0x2);
         cpu.a = 0xf;
         cpu.run_opcode(0x3c);
+        assert!(cpu.get_flag_h());
+        Ok(())
+    }
+
+    #[test]
+    fn test_dec() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x05);
+        assert_eq!(cpu.b, 0x0);
+        cpu.a = 0x10;
+        cpu.run_opcode(0x3d);
         assert!(cpu.get_flag_h());
         Ok(())
     }
