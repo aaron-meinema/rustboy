@@ -1,7 +1,9 @@
 use crate::cardridge::Cardridge;
+use crate::renderer::Renderer;
 
 pub struct MemoryMap {
     pub cardridge: Cardridge,
+    pub renderer: Renderer,
     memory: [u8; 0x10000],
 }
 
@@ -11,6 +13,7 @@ impl MemoryMap {
 
         let memory_map = MemoryMap {
             cardridge: the_cardridge,
+            renderer: Renderer::new(),
             memory: mem,
         };
 
@@ -35,7 +38,10 @@ impl MemoryMap {
     }
 
     pub fn store_8bit_full_address(&mut self, memory_location: usize, value: u8) {
-        self.memory[memory_location] = value;
+        match memory_location {
+            0x8000..= 0x97ff => self.renderer.store_data(memory_location, value),
+            _ =>                self.memory[memory_location] = value,
+        }
     }
 
     fn get_8bit_address(&self, memory_location: u8) -> usize {

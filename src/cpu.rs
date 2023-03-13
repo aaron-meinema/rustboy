@@ -13,7 +13,7 @@ pub struct Cpu {
     f: u8,
     cycle_counter: u16,
     memory_counter: usize,
-    memory_map: MemoryMap
+    pub memory_map: MemoryMap
 }
 
 const CPU_FIRST: u8  = 0b0000_0111;

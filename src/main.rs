@@ -1,8 +1,9 @@
 mod cpu;
 mod cardridge;
 mod memory_map;
+mod renderer;
 
-extern crate sdl2; 
+extern crate sdl2;
 
 use sdl2::pixels::Color;
 use sdl2::event::Event;
@@ -30,13 +31,19 @@ pub fn main() {
     canvas.set_draw_color(Color::RGB(0, 255, 255));
     canvas.clear();
     canvas.present();
-    let point = Point::new(5,3);
+
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
-        canvas.set_draw_color(Color::RGB(0, 255, 255));
         canvas.clear();
         canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.draw_point(point).expect("error drawing point");
+        let oke = cpu.memory_map.renderer.get_screen();
+        for item in oke {
+            canvas.set_draw_color(item.color);
+
+            canvas.draw_point(Point::new(item.x, item.y));
+        }
+
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
