@@ -14,9 +14,10 @@ struct Pixel {
     priority: u8,
     color: Color,
 }
+
 pub struct ColorPosition {
-    pub x: i32,
     pub y: i32,
+    pub x: i32,
 
     pub color: Color
 }
@@ -49,16 +50,22 @@ impl Renderer {
 
     pub fn get_screen (&self) -> Vec<ColorPosition> {
         let mut screen: Vec<ColorPosition> = Vec::new();
+        for y in 0..= HEIGHT * 2 {
+            let index = usize::try_from(y%4).unwrap();
+            let color = self.color[index];
+            for x in 0..= WIDTH * 2 {
+                let clr_position = ColorPosition {
+                    y,
+                    x,
+                    color,
+                };
+                screen.push(clr_position);
+            }
+        }
         for x in 0..WIDTH*2 {
             let index = usize::try_from(x%4).unwrap();
             let color = self.color[index];
             for y in 0..HEIGHT*2 {
-                let clr_position = ColorPosition {
-                    x,
-                    y,
-                    color,
-                };
-                screen.push(clr_position);
             }
         }
 
@@ -66,7 +73,7 @@ impl Renderer {
     }
 
     fn get_background(&self) {
-        todo!();
+        todo!("implement");
     }
 
 

@@ -1,12 +1,11 @@
 {
-
     "version": "0.2.0",
     "configurations": [
         {
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${fileDirname}/../target/debug/gameboy-emu",
+            "program": "${fileDirname}/../target/debug/rustboy",
             "args": [],
             "cwd": "${workspaceRoot}",
             "sourceLanguages": [
