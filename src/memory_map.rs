@@ -39,7 +39,8 @@ impl MemoryMap {
 
     pub fn store_8bit_full_address(&mut self, memory_location: usize, value: u8) {
         match memory_location {
-            0x8000..= 0x97ff => self.renderer.store_data(memory_location, value),
+            0x8000..= 0x9fff => self.renderer.store(memory_location, value),
+            0xff40..         => self.renderer.set_lcdc(value),
             _ =>                self.memory[memory_location] = value,
         }
     }

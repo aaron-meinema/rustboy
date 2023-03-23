@@ -8,10 +8,10 @@
             "type": "shell",
             "command": "~/.cargo/bin/cargo", // note: full path to the cargo
             "args": [
-                "run",
-            ],
+                "build",
+             ],
             "group": {
-                "kind": "run",
+                "kind": "build",
                 "isDefault": true
             }
         }
