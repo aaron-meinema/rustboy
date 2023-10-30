@@ -54,6 +54,7 @@ impl Cpu {
             0x12         => self.lddea(),
             0x22         => self.ldhlp(),
             0x27         => self.daa(),
+            0x2f         => self.cpl(),
             0x32         => self.ldhlm(),
             0x3f         => self.ccf(),
             0x0a         => self.ldabc(),
@@ -81,6 +82,14 @@ impl Cpu {
             _ => self.default(opcode),
 
         }
+    }
+
+    fn cpl(&mut self) {
+        self.a = !self.a;
+        self.set_flag_n(true);
+        self.set_flag_h(true);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn ccf(&mut self) {
@@ -568,6 +577,14 @@ mod tests {
             memory_counter: 0,
             memory_map: MemoryMap::new(cardridge)
         }
+    }
+    
+    #[test]
+    fn test_cpl() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x2f);
+        assert_eq!(cpu.a, 0xff - 0x07);
+        Ok(())
     }
 
     #[test]
