@@ -583,7 +583,7 @@ mod tests {
     fn test_cpl() -> Result<(), String> {
         let mut cpu = get_cpu();
         cpu.run_opcode(0x2f);
-        assert_eq!(cpu.a, 0);
+        assert_eq!(cpu.a, 0xff - 0x07);
         Ok(())
     }
 
