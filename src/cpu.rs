@@ -55,6 +55,7 @@ impl Cpu {
             0x22         => self.ldhlp(),
             0x27         => self.daa(),
             0x32         => self.ldhlm(),
+            0x3f         => self.ccf(),
             0x0a         => self.ldabc(),
             0x1a         => self.ldade(),
             0x2a         => self.ldahlp(),
@@ -80,6 +81,14 @@ impl Cpu {
             _ => self.default(opcode),
 
         }
+    }
+
+    fn ccf(&mut self) {
+        self.f  = self.f ^ 0x10;
+        self.set_flag_n(false);
+        self.set_flag_h(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn ld_a16_a(&mut self) {
@@ -560,6 +569,21 @@ mod tests {
             memory_map: MemoryMap::new(cardridge)
         }
     }
+
+    #[test]
+    fn test_ccf() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        assert_eq!(cpu.get_flag_c(), false);
+        cpu.run_opcode(0x3f);
+        assert_eq!(cpu.get_flag_c(), true);
+        cpu.run_opcode(0x3f);
+        assert_eq!(cpu.get_flag_c(), false);
+        cpu.f = 0xff;
+        cpu.run_opcode(0x3f);
+        assert_eq!(cpu.f, 0x8f);
+        Ok(())
+    }
+
     #[test]
     fn test_get_from_reg() -> Result<(), String> {
         let mut cpu = get_cpu();
