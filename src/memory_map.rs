@@ -26,9 +26,6 @@ impl MemoryMap {
     }
 
     pub fn get_8bit_full_address(&self, memory_location: usize) -> u8 {
-        for x in 0x0500..0x0510 {
-            println!("location: {:x} has the value: {}",x, self.memory.get(x).unwrap());
-        }
         self.memory.get(memory_location).unwrap().clone()
     }
 
@@ -41,8 +38,11 @@ impl MemoryMap {
         match memory_location {
             0x8000..= 0x9fff => self.renderer.store(memory_location, value),
             0xff40..         => self.renderer.set_lcdc(value),
-            _ =>                self.memory[memory_location] = value,
+            _ => (),
         }
+
+        self.memory[memory_location] = value;
+
     }
 
     fn get_8bit_address(&self, memory_location: u8) -> usize {

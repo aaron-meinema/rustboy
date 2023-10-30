@@ -560,6 +560,7 @@ mod tests {
             memory_map: MemoryMap::new(cardridge)
         }
     }
+    
     #[test]
     fn test_get_from_reg() -> Result<(), String> {
         let mut cpu = get_cpu();
