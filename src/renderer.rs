@@ -2,6 +2,7 @@ use sdl2::pixels::Color;
 use std::fmt::Debug;
 pub const WIDTH:  i32 = 160;
 pub const HEIGHT: i32 = 144;
+pub const DEBUG: i32 = 30;
 
 pub struct Renderer {
     tile_data: [u8; 0x9fff - 0x8000],
