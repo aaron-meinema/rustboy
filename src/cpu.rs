@@ -50,6 +50,7 @@ impl Cpu {
 
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
+            0x00         => self.nop(),
             0x02         => self.ldbca(),
             0x12         => self.lddea(),
             0x22         => self.ldhlp(),
@@ -560,6 +561,11 @@ impl Cpu {
         self.cycle_counter += 4;
         return h + l;
     }
+
+    fn nop(&mut self) {
+        self.cycle_counter += 4;
+        self.memory_counter += 1;
+    }
 }
 
 
@@ -949,7 +955,4 @@ mod tests {
         assert_eq!(cpu.a, 0x81);
         Ok(())
     }
-
-
-
 }
