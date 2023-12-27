@@ -108,7 +108,7 @@ pub fn main() {
     'running: loop {
         sdl_help.add_debug_message(format!("{:#04x}", &cpu.memory_map.get_8bit_full_address(0xff00)).as_str().to_string());
         sdl_help.add_debug_message("hello world".to_owned());
-    
+        
         sdl_help.canvas.clear();
         sdl_help.canvas.set_draw_color(Color::RGB(0, 0, 0));
         let render = cpu.memory_map.renderer.get_screen();
