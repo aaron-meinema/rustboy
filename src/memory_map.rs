@@ -31,8 +31,8 @@ impl MemoryMap {
 
     pub fn get_8bit_full_address(&self, memory_location: usize) -> u8 {
         match memory_location {
-            0xff00..    => return self.get_joypad(),
-            _           => self.memory.get(memory_location).unwrap().clone()
+            0xff00      => return self.get_joypad(),
+            _           => return self.memory.get(memory_location).unwrap().clone()
         } 
     }
 
@@ -50,7 +50,6 @@ impl MemoryMap {
     }
 
     fn get_joypad(&self) -> u8 {
-        let test = self.memory[0xff00];
         let compare = self.memory[0xff00] & 0x30;
         if compare == 0x30 {
             return 0x3f;
