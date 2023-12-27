@@ -81,6 +81,7 @@ impl Sdl2Helper {
             
             index += 2;
         }
+        self.debug_message = Vec::new();
     }
 
     fn add_debug_message(&mut self, value: String) {
@@ -98,13 +99,16 @@ pub fn main() {
     };
     
     let mut cpu = cpu::Cpu::new(cardridge);
+    cpu.memory_map.store_8bit_full_address(0xff00, 0x30);
 
-    cpu.start_cycle();
+    let mut buttons: u8 = 0x0f;
+    let mut d_pad: u8 = 0x0f;
 
-    sdl_help.add_debug_message(format!("{:x?}", &cpu.memory_map.get_8bit_full_address(0004)).as_str().to_string());
-    sdl_help.add_debug_message("hello world".to_owned());
-    
+
     'running: loop {
+        sdl_help.add_debug_message(format!("{:#04x}", &cpu.memory_map.get_8bit_full_address(0xff00)).as_str().to_string());
+        sdl_help.add_debug_message("hello world".to_owned());
+    
         sdl_help.canvas.clear();
         sdl_help.canvas.set_draw_color(Color::RGB(0, 0, 0));
         let render = cpu.memory_map.renderer.get_screen();
@@ -119,20 +123,69 @@ pub fn main() {
                 }
             }
         }
-
+        
         sdl_help.print_debug_messages();
-
         for event in sdl_help.event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
                 },
+                Event::KeyDown { keycode: Some(Keycode::Z), .. } => {       //A
+                    buttons &= 0xfe;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Z), .. } => {         //A
+                    buttons |= 1;
+                },
+                Event::KeyDown { keycode: Some(Keycode::X), .. } => {       //B
+                    buttons &= 0xfd;
+                },
+                Event::KeyUp { keycode: Some(Keycode::X), .. } => {         //B
+                    buttons |= 2;
+                },
+                Event::KeyDown { keycode: Some(Keycode::Space), .. } => {  //Select
+                    buttons &= 0xfb;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Space), .. } => {    //Select
+                    buttons |= 4;
+                }, 
+                Event::KeyDown { keycode: Some(Keycode::Return), .. } => { //Start
+                    buttons &= 0xf7;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Return), .. } => {   //Start
+                    buttons |= 8;
+                },
+                Event::KeyDown { keycode: Some(Keycode::Right), .. } => {  //Right
+                    d_pad &= 0xfe;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Right), .. } => {    //Right
+                    d_pad |= 1;
+                },
+                Event::KeyDown { keycode: Some(Keycode::Left), .. } => {   //Left
+                    d_pad &= 0xfd;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Left), .. } => {     //Left
+                    d_pad |= 2;
+                },
+                Event::KeyDown { keycode: Some(Keycode::Up), .. } => {      //UP
+                    d_pad &= 0xfb;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Up), .. } => {        //UP
+                    d_pad |= 4;
+                },
+                Event::KeyDown { keycode: Some(Keycode::Down), .. } => {    //Down
+                    d_pad &= 0xf7;
+                },
+                Event::KeyUp { keycode: Some(Keycode::Down), .. } => {      //DOWN
+                    d_pad |= 8;
+                },
+                
                 _ => {}
             }
         }
+        cpu.memory_map.store_buttons(buttons);
+        cpu.memory_map.store_d_pad(d_pad);
         // The rest of the game loop goes here...
-
         sdl_help.canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
