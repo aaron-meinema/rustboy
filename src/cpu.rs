@@ -13,6 +13,7 @@ pub struct Cpu {
     f: u8,
     cycle_counter: u16,
     memory_counter: usize,
+    stopped: bool,
     pub memory_map: MemoryMap
 }
 
@@ -33,18 +34,21 @@ impl Cpu {
             f: 0,
             memory_counter: 0,
             cycle_counter: 0,
+            stopped: false,
             memory_map: MemoryMap::new(the_cardridge),
         };
         cpu
     }
 
     pub fn start_cycle(&mut self) {
-        loop {
-            if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
-                return
+        if !self.stopped {
+            loop {
+                if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
+                    return
+                }
+                let number = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
+                self.run_opcode(*number);
             }
-            let number = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
-            self.run_opcode(*number);
         }
     }
 
@@ -52,6 +56,7 @@ impl Cpu {
         match opcode {
             0x00         => self.nop(),
             0x02         => self.ldbca(),
+            0x10         => self.stop(),
             0x12         => self.lddea(),
             0x22         => self.ldhlp(),
             0x27         => self.daa(),
@@ -566,6 +571,13 @@ impl Cpu {
         self.cycle_counter += 4;
         self.memory_counter += 1;
     }
+
+    fn stop(&mut self) {
+        self.cycle_counter += 4;
+        self.memory_counter += 2;
+        self.stopped = true;
+        !todo!("make renderer and others also stop")
+    }
 }
 
 
@@ -590,6 +602,7 @@ mod tests {
             f: 0,
             cycle_counter: 0,
             memory_counter: 0,
+            stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
     }
@@ -740,8 +753,6 @@ mod tests {
         assert_eq!(cpu.a, 0);
         Ok(())
     }
-
-
 
     #[test]
     fn test_ld_from_cardridge() -> Result<(), String> {
