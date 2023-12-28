@@ -1,3 +1,5 @@
+use sdl2::libc::OVERLAYFS_SUPER_MAGIC;
+
 use crate::cardridge::Cardridge;
 use crate::memory_map::MemoryMap;
 
@@ -13,6 +15,7 @@ pub struct Cpu {
     f: u8,
     cycle_counter: u16,
     memory_counter: usize,
+    stack_counter: u16,
     stopped: bool,
     pub memory_map: MemoryMap
 }
@@ -34,6 +37,7 @@ impl Cpu {
             f: 0,
             memory_counter: 0,
             cycle_counter: 0,
+            stack_counter: 0,
             stopped: false,
             memory_map: MemoryMap::new(the_cardridge),
         };
@@ -56,12 +60,16 @@ impl Cpu {
         match opcode {
             0x00         => self.nop(),
             0x02         => self.ldbca(),
+            0x03         => self.incbc(),
             0x10         => self.stop(),
             0x12         => self.lddea(),
+            0x13         => self.incde(),
             0x22         => self.ldhlp(),
+            0x23         => self.inchl(),
             0x27         => self.daa(),
             0x2f         => self.cpl(),
             0x32         => self.ldhlm(),
+            0x33         => self.incsp(),
             0x3f         => self.ccf(),
             0x0a         => self.ldabc(),
             0x1a         => self.ldade(),
@@ -113,6 +121,42 @@ impl Cpu {
         self.set_flag_h(false);
         self.memory_counter += 1;
         self.cycle_counter += 4;
+    }
+
+    fn incbc(&mut self) {
+        let overflow = self.c.overflowing_add(1);
+        self.c = overflow.0;
+        if overflow.1 {
+            self.b = self.b.overflowing_add(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn incde(&mut self) {
+        let overflow = self.e.overflowing_add(1);
+        self.e = overflow.0;
+        if overflow.1 {
+            self.d = self.d.overflowing_add(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn inchl(&mut self) {
+        let overflow = self.l.overflowing_add(1);
+        self.l = overflow.0;
+        if overflow.1 {
+            self.h = self.h.overflowing_add(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn incsp(&mut self) {
+        let overflow = self.stack_counter.overflowing_add(1);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
     }
 
     fn ld_a16_a(&mut self) {
@@ -602,9 +646,28 @@ mod tests {
             f: 0,
             cycle_counter: 0,
             memory_counter: 0,
+            stack_counter: 0,
             stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
+    }
+
+    #[test]
+    fn test_incbc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.c = 255;
+        cpu.incbc();
+        assert_eq!(2, cpu.b);
+        assert_eq!(0, cpu.c);
+        cpu.c = 255;
+        cpu.b = 255;
+        cpu.incbc();
+        assert_eq!(0, cpu.b);
+        assert_eq!(0, cpu.c);
+        cpu.incbc();
+        assert_eq!(0, cpu.b);
+        assert_eq!(1, cpu.c);
+        Ok(())
     }
 
     #[test]
