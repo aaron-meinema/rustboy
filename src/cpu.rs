@@ -61,6 +61,7 @@ impl Cpu {
             0x00         => self.nop(),
             0x02         => self.ldbca(),
             0x03         => self.incbc(),
+            0x0b         => self.decbc(),
             0x10         => self.stop(),
             0x12         => self.lddea(),
             0x13         => self.incde(),
@@ -155,6 +156,42 @@ impl Cpu {
 
     fn incsp(&mut self) {
         let overflow = self.stack_counter.overflowing_add(1);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn decbc(&mut self) {
+        let overflow = self.c.overflowing_sub(1);
+        self.c = overflow.0;
+        if overflow.1 {
+            self.b = self.b.overflowing_sub(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn decde(&mut self) {
+        let overflow = self.e.overflowing_sub(1);
+        self.e = overflow.0;
+        if overflow.1 {
+            self.d = self.d.overflowing_sub(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn dechl(&mut self) {
+        let overflow = self.l.overflowing_sub(1);
+        self.l = overflow.0;
+        if overflow.1 {
+            self.h = self.h.overflowing_sub(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn decsp(&mut self) {
+        let overflow = self.stack_counter.overflowing_sub(1);
         self.memory_counter += 1;
         self.cycle_counter += 8;
     }
@@ -667,6 +704,24 @@ mod tests {
         cpu.incbc();
         assert_eq!(0, cpu.b);
         assert_eq!(1, cpu.c);
+        Ok(())
+    }
+
+    #[test]
+    fn test_decbc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.c = 0;
+        cpu.decbc();
+        assert_eq!(0, cpu.b);
+        assert_eq!(255, cpu.c);
+        cpu.c = 0;
+        cpu.b = 0;
+        cpu.decbc();
+        assert_eq!(255, cpu.b);
+        assert_eq!(255, cpu.c);
+        cpu.decbc();
+        assert_eq!(255, cpu.b);
+        assert_eq!(254, cpu.c);
         Ok(())
     }
 
