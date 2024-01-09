@@ -118,7 +118,10 @@ impl Cpu {
         let result = self.a >> 7;
 
         self.a = self.a << 1;
-        self.set_flag_c(result == 1);
+        if result == 1 {
+            self.set_flag_c(true);
+            self.a += 1;
+        }
         self.cycle_counter +=4;
     }
 
@@ -758,7 +761,7 @@ mod tests {
         assert!(!cpu.get_flag_c());
         cpu.a =0xff;
         cpu.rcla();
-        assert_eq!(0xfe, cpu.a);
+        assert_eq!(0xff, cpu.a);
         assert!(cpu.get_flag_c());
 
         Ok(())
