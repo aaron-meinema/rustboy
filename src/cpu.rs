@@ -51,8 +51,8 @@ impl Cpu {
                 if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
                     return
                 }
-                let number = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
-                self.run_opcode(*number);
+                let number = self.get_from_cardridge();
+                self.run_opcode(number);
             }
         }
     }
@@ -248,9 +248,9 @@ impl Cpu {
 
     fn ld_a16_a(&mut self) {
         self.memory_counter += 1;
-        let mut high: u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let mut high: u16 = self.get_from_cardridge().into();
         self.memory_counter += 1;
-        let low:u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let low:u16 = self.get_from_cardridge().into();
         high = high << 8;
         self.memory_map.store_8bit_full_address((high + low).into(), self.a);
         self.memory_counter += 1;
@@ -259,9 +259,9 @@ impl Cpu {
 
     fn ld_a_a16(&mut self) {
         self.memory_counter += 1;
-        let mut high: u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let mut high: u16 = self.get_from_cardridge().into();
         self.memory_counter += 1;
-        let low:u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let low:u16 = self.get_from_cardridge().into();
         high = high << 8;
         self.a = self.memory_map.get_8bit_full_address((high + low).into());
         self.memory_counter += 1;
@@ -355,7 +355,7 @@ impl Cpu {
 
     fn ld_to_memory(&mut self) {
         self.memory_counter += 1;
-        let location = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        let location = self.get_from_cardridge().clone();
         self.memory_map.store_8bit(location, self.a);
         self.memory_counter += 1;
         self.cycle_counter += 12;
@@ -370,7 +370,7 @@ impl Cpu {
 
     fn ld_from_memory(&mut self) {
         self.memory_counter += 1;
-        let location = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        let location = self.get_from_cardridge().clone();
         self.a = self.memory_map.get_8bit(location);
         self.memory_counter += 1;
         self.cycle_counter += 12;
@@ -385,7 +385,7 @@ impl Cpu {
     fn ld_from_cardridge(&mut self, opcode: u8) {
         self.memory_counter += 1;
         let register = u8::from(opcode & CPU_SECOND);
-        let value = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        let value = self.get_from_cardridge();
         self.store_value_into_register(value, register);
         self.memory_counter += 1;
         self.cycle_counter += 8;
