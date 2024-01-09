@@ -67,6 +67,7 @@ impl Cpu {
             0x01         => self.ld_bc(),
             0x02         => self.ldbca(),
             0x03         => self.incbc(),
+            0x07         => self.rcla(),
             0x0b         => self.decbc(),
             0x10         => self.stop(),
             0x11         => self.ld_de(),
@@ -110,6 +111,15 @@ impl Cpu {
             _ => self.default(opcode),
 
         }
+    }
+
+    fn rcla(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a >> 7;
+
+        self.a = self.a << 1;
+        self.set_flag_c(result == 1);
+        self.cycle_counter +=4;
     }
 
     fn scf(&mut self) {
@@ -737,6 +747,21 @@ mod tests {
             stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
+    }
+
+    #[test]
+    fn test_rcla() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=1;
+        cpu.rcla();
+        assert_eq!(2, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rcla();
+        assert_eq!(0xfe, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
     }
 
     #[test]
