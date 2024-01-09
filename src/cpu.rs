@@ -1,4 +1,5 @@
 use sdl2::libc::OVERLAYFS_SUPER_MAGIC;
+use serde::de::value::Error;
 
 use crate::cardridge::Cardridge;
 use crate::memory_map::MemoryMap;
@@ -56,21 +57,29 @@ impl Cpu {
         }
     }
 
+    fn get_from_cardridge(&mut self) -> u8 {
+        return *self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
+    }
+
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
             0x00         => self.nop(),
+            0x01         => self.ld_bc(),
             0x02         => self.ldbca(),
             0x03         => self.incbc(),
             0x0b         => self.decbc(),
             0x10         => self.stop(),
+            0x11         => self.ld_de(),
             0x12         => self.lddea(),
             0x13         => self.incde(),
             0x1b         => self.decde(),
+            0x21         => self.ld_hl(),
             0x22         => self.ldhlp(),
             0x23         => self.inchl(),
             0x27         => self.daa(),
             0x2b         => self.dechl(),
             0x2f         => self.cpl(),
+            0x31         => self.ld_sp(),
             0x32         => self.ldhlm(),
             0x33         => self.incsp(),
             0x3b         => self.decsp(),
@@ -197,6 +206,44 @@ impl Cpu {
         let overflow = self.stack_counter.overflowing_sub(1);
         self.memory_counter += 1;
         self.cycle_counter += 8;
+    }
+
+    fn ld_bc(&mut self) {
+        self.memory_counter += 1;
+        self.b = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.c = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
+    fn ld_de(&mut self) {
+        self.memory_counter += 1;
+        self.d = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.e = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
+    fn ld_hl(&mut self) {
+        self.memory_counter += 1;
+        self.h = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.l = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
+    fn ld_sp(&mut self) {
+        self.memory_counter += 1;
+        let mut high: u16 = self.get_from_cardridge().into();
+        self.memory_counter += 1;
+        let low: u16 = self.get_from_cardridge().into();
+        high = high << 8;
+        self.stack_counter = high + low;
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
     }
 
     fn ld_a16_a(&mut self) {
@@ -690,6 +737,15 @@ mod tests {
             stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
+    }
+
+    #[test]
+    fn test_ld_bc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.ld_bc();
+        assert_eq!(0x41, cpu.b);
+        assert_eq!(0x42, cpu.c);
+        Ok(())
     }
 
     #[test]
