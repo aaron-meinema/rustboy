@@ -68,6 +68,7 @@ impl Cpu {
             0x02         => self.ldbca(),
             0x03         => self.incbc(),
             0x07         => self.rcla(),
+            0x0f         => self.rrca(),
             0x0b         => self.decbc(),
             0x10         => self.stop(),
             0x11         => self.ld_de(),
@@ -114,6 +115,19 @@ impl Cpu {
         }
     }
 
+    fn rrca(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a & 1;
+
+        self.a = self.a >> 1;
+        if result == 1 {
+            self.set_flag_c(true);
+            self.a += 0x80;
+        }
+        self.cycle_counter +=4;
+    }
+
+
     fn rla(&mut self) {
         self.memory_counter += 1;
         let result = self.a >> 7;
@@ -127,7 +141,6 @@ impl Cpu {
         }
         self.cycle_counter +=4;
     }
-
 
     fn rcla(&mut self) {
         self.memory_counter += 1;
@@ -766,6 +779,21 @@ mod tests {
             stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
+    }
+
+    #[test]
+    fn test_rrca() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=2;
+        cpu.rrca();
+        assert_eq!(1, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rrca();
+        assert_eq!(0xff, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
     }
 
     #[test]
