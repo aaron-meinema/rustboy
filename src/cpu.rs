@@ -75,6 +75,7 @@ impl Cpu {
             0x12         => self.lddea(),
             0x13         => self.incde(),
             0x17         => self.rla(),
+            0x1f         => self.rra(),
             0x1b         => self.decde(),
             0x21         => self.ld_hl(),
             0x22         => self.ldhlp(),
@@ -127,6 +128,19 @@ impl Cpu {
         self.cycle_counter +=4;
     }
 
+    fn rra(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a & 1;
+
+        self.a = self.a >> 1;
+        if self.get_flag_c() {
+            self.a += 0x80;
+        }
+        if result == 1 {
+            self.set_flag_c(true);
+        }
+        self.cycle_counter +=4;
+    }
 
     fn rla(&mut self) {
         self.memory_counter += 1;
@@ -791,6 +805,21 @@ mod tests {
         cpu.a =0xff;
         cpu.rrca();
         assert_eq!(0xff, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rra() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=2;
+        cpu.rra();
+        assert_eq!(1, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rra();
+        assert_eq!(0xff-0x80, cpu.a);
         assert!(cpu.get_flag_c());
 
         Ok(())
