@@ -4,6 +4,7 @@ use std::fmt::Debug;
 
 pub const WIDTH: i32 = 160;
 pub const HEIGHT: i32 = 144;
+pub const DEBUG: i32 = 30;
 
 pub struct Renderer {
     tile_data: [u8; 0x9fff - 0x8000],
@@ -214,10 +215,9 @@ impl Renderer {
     fn get_sprite(&self, number: usize) -> Sprite {
         let oam_offset = number * 4;
         let tile = self.get_tile(<u8 as Into<usize>>::into(self.oam_data[oam_offset + 2]) + 0x8000);
-        println!("{:x}", oam_offset + 0xfe03);
         let extra = i32::try_from(number).unwrap();
-        let x = i32::from(self.oam_data[oam_offset]) - 8 + extra;
-        let y = i32::from(self.oam_data[oam_offset + 1]) - 16 + extra;
+        let x = i32::from(self.oam_data[oam_offset]) - 8;
+        let y = i32::from(self.oam_data[oam_offset + 1]) - 16;
         let tile = self.convert_tile(tile);
         let flags = self.oam_data[oam_offset + 3];
 

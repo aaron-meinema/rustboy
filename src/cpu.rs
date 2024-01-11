@@ -1,3 +1,6 @@
+use sdl2::libc::OVERLAYFS_SUPER_MAGIC;
+use serde::de::value::Error;
+
 use crate::cardridge::Cardridge;
 use crate::memory_map::MemoryMap;
 
@@ -13,6 +16,8 @@ pub struct Cpu {
     f: u8,
     cycle_counter: u16,
     memory_counter: usize,
+    stack_counter: u16,
+    stopped: bool,
     pub memory_map: MemoryMap
 }
 
@@ -33,31 +38,60 @@ impl Cpu {
             f: 0,
             memory_counter: 0,
             cycle_counter: 0,
+            stack_counter: 0,
+            stopped: false,
             memory_map: MemoryMap::new(the_cardridge),
         };
         cpu
     }
 
     pub fn start_cycle(&mut self) {
-        loop {
-            if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
-                return
+        if !self.stopped {
+            loop {
+                if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
+                    return
+                }
+                let number = self.get_from_cardridge();
+                self.run_opcode(number);
             }
-            let number = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
-            self.run_opcode(*number);
         }
+    }
+
+    fn get_from_cardridge(&mut self) -> u8 {
+        return *self.memory_map.cardridge.memory.get(self.memory_counter).unwrap();
     }
 
     fn run_opcode(&mut self, opcode: u8) {
         match opcode {
+            0x00         => self.nop(),
+            0x01         => self.ld_bc(),
             0x02         => self.ldbca(),
+            0x03         => self.incbc(),
+            0x07         => self.rcla(),
+            0x0f         => self.rrca(),
+            0x0b         => self.decbc(),
+            0x10         => self.stop(),
+            0x11         => self.ld_de(),
             0x12         => self.lddea(),
+            0x13         => self.incde(),
+            0x17         => self.rla(),
+            0x1f         => self.rra(),
+            0x1b         => self.decde(),
+            0x21         => self.ld_hl(),
             0x22         => self.ldhlp(),
+            0x23         => self.inchl(),
             0x27         => self.daa(),
+            0x2b         => self.dechl(),
+            0x2f         => self.cpl(),
+            0x31         => self.ld_sp(),
             0x32         => self.ldhlm(),
+            0x33         => self.incsp(),
+            0x3b         => self.decsp(),
+            0x3f         => self.ccf(),
             0x0a         => self.ldabc(),
             0x1a         => self.ldade(),
             0x2a         => self.ldahlp(),
+            0x37         => self.scf(),
             0x3a         => self.ldahlm(),
             0xea         => self.ld_a16_a(),
             0xfa         => self.ld_a_a16(),
@@ -82,11 +116,197 @@ impl Cpu {
         }
     }
 
+    fn rrca(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a & 1;
+
+        self.a = self.a >> 1;
+        if result == 1 {
+            self.set_flag_c(true);
+            self.a += 0x80;
+        }
+        self.cycle_counter +=4;
+    }
+
+    fn rra(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a & 1;
+
+        self.a = self.a >> 1;
+        if self.get_flag_c() {
+            self.a += 0x80;
+        }
+        if result == 1 {
+            self.set_flag_c(true);
+        }
+        self.cycle_counter +=4;
+    }
+
+    fn rla(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a >> 7;
+
+        self.a = self.a << 1;
+        if self.get_flag_c() {
+            self.a += 1;
+        }
+        if result == 1 {
+            self.set_flag_c(true);
+        }
+        self.cycle_counter +=4;
+    }
+
+    fn rcla(&mut self) {
+        self.memory_counter += 1;
+        let result = self.a >> 7;
+
+        self.a = self.a << 1;
+        if result == 1 {
+            self.set_flag_c(true);
+            self.a += 1;
+        }
+        self.cycle_counter +=4;
+    }
+
+    fn scf(&mut self) {
+        self.set_flag_c(true);
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
+    fn cpl(&mut self) {
+        self.a = !self.a;
+        self.set_flag_n(true);
+        self.set_flag_h(true);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
+    fn ccf(&mut self) {
+        self.f  = self.f ^ 0x10;
+        self.set_flag_n(false);
+        self.set_flag_h(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
+    }
+
+    fn incbc(&mut self) {
+        let overflow = self.c.overflowing_add(1);
+        self.c = overflow.0;
+        if overflow.1 {
+            self.b = self.b.overflowing_add(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn incde(&mut self) {
+        let overflow = self.e.overflowing_add(1);
+        self.e = overflow.0;
+        if overflow.1 {
+            self.d = self.d.overflowing_add(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn inchl(&mut self) {
+        let overflow = self.l.overflowing_add(1);
+        self.l = overflow.0;
+        if overflow.1 {
+            self.h = self.h.overflowing_add(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn incsp(&mut self) {
+        let overflow = self.stack_counter.overflowing_add(1);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn decbc(&mut self) {
+        let overflow = self.c.overflowing_sub(1);
+        self.c = overflow.0;
+        if overflow.1 {
+            self.b = self.b.overflowing_sub(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn decde(&mut self) {
+        let overflow = self.e.overflowing_sub(1);
+        self.e = overflow.0;
+        if overflow.1 {
+            self.d = self.d.overflowing_sub(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn dechl(&mut self) {
+        let overflow = self.l.overflowing_sub(1);
+        self.l = overflow.0;
+        if overflow.1 {
+            self.h = self.h.overflowing_sub(1).0;
+        }
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn decsp(&mut self) {
+        let overflow = self.stack_counter.overflowing_sub(1);
+        self.memory_counter += 1;
+        self.cycle_counter += 8;
+    }
+
+    fn ld_bc(&mut self) {
+        self.memory_counter += 1;
+        self.b = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.c = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
+    fn ld_de(&mut self) {
+        self.memory_counter += 1;
+        self.d = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.e = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
+    fn ld_hl(&mut self) {
+        self.memory_counter += 1;
+        self.h = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.l = self.get_from_cardridge();
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
+    fn ld_sp(&mut self) {
+        self.memory_counter += 1;
+        let mut high: u16 = self.get_from_cardridge().into();
+        self.memory_counter += 1;
+        let low: u16 = self.get_from_cardridge().into();
+        high = high << 8;
+        self.stack_counter = high + low;
+        self.memory_counter += 1;
+        self.cycle_counter  += 12;
+    }
+
     fn ld_a16_a(&mut self) {
         self.memory_counter += 1;
-        let mut high: u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let mut high: u16 = self.get_from_cardridge().into();
         self.memory_counter += 1;
-        let low:u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let low:u16 = self.get_from_cardridge().into();
         high = high << 8;
         self.memory_map.store_8bit_full_address((high + low).into(), self.a);
         self.memory_counter += 1;
@@ -95,9 +315,9 @@ impl Cpu {
 
     fn ld_a_a16(&mut self) {
         self.memory_counter += 1;
-        let mut high: u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let mut high: u16 = self.get_from_cardridge().into();
         self.memory_counter += 1;
-        let low:u16 = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone().into();
+        let low:u16 = self.get_from_cardridge().into();
         high = high << 8;
         self.a = self.memory_map.get_8bit_full_address((high + low).into());
         self.memory_counter += 1;
@@ -191,7 +411,7 @@ impl Cpu {
 
     fn ld_to_memory(&mut self) {
         self.memory_counter += 1;
-        let location = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        let location = self.get_from_cardridge().clone();
         self.memory_map.store_8bit(location, self.a);
         self.memory_counter += 1;
         self.cycle_counter += 12;
@@ -206,7 +426,7 @@ impl Cpu {
 
     fn ld_from_memory(&mut self) {
         self.memory_counter += 1;
-        let location = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        let location = self.get_from_cardridge().clone();
         self.a = self.memory_map.get_8bit(location);
         self.memory_counter += 1;
         self.cycle_counter += 12;
@@ -221,7 +441,7 @@ impl Cpu {
     fn ld_from_cardridge(&mut self, opcode: u8) {
         self.memory_counter += 1;
         let register = u8::from(opcode & CPU_SECOND);
-        let value = self.memory_map.cardridge.memory.get(self.memory_counter).unwrap().clone();
+        let value = self.get_from_cardridge();
         self.store_value_into_register(value, register);
         self.memory_counter += 1;
         self.cycle_counter += 8;
@@ -533,6 +753,18 @@ impl Cpu {
         self.cycle_counter += 4;
         return h + l;
     }
+
+    fn nop(&mut self) {
+        self.cycle_counter += 4;
+        self.memory_counter += 1;
+    }
+
+    fn stop(&mut self) {
+        self.cycle_counter += 4;
+        self.memory_counter += 2;
+        self.stopped = true;
+        !todo!("make renderer and others also stop")
+    }
 }
 
 
@@ -557,9 +789,154 @@ mod tests {
             f: 0,
             cycle_counter: 0,
             memory_counter: 0,
+            stack_counter: 0,
+            stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
     }
+
+    #[test]
+    fn test_rrca() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=2;
+        cpu.rrca();
+        assert_eq!(1, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rrca();
+        assert_eq!(0xff, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rra() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=2;
+        cpu.rra();
+        assert_eq!(1, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rra();
+        assert_eq!(0xff-0x80, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rcla() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=1;
+        cpu.rcla();
+        assert_eq!(2, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rcla();
+        assert_eq!(0xff, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rla() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.a=1;
+        cpu.rla();
+        assert_eq!(2, cpu.a);
+        assert!(!cpu.get_flag_c());
+        cpu.a =0xff;
+        cpu.rla();
+        assert_eq!(0xfe, cpu.a);
+        assert!(cpu.get_flag_c());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ld_bc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.ld_bc();
+        assert_eq!(0x41, cpu.b);
+        assert_eq!(0x42, cpu.c);
+        Ok(())
+    }
+
+    #[test]
+    fn test_incbc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.c = 255;
+        cpu.incbc();
+        assert_eq!(2, cpu.b);
+        assert_eq!(0, cpu.c);
+        cpu.c = 255;
+        cpu.b = 255;
+        cpu.incbc();
+        assert_eq!(0, cpu.b);
+        assert_eq!(0, cpu.c);
+        cpu.incbc();
+        assert_eq!(0, cpu.b);
+        assert_eq!(1, cpu.c);
+        Ok(())
+    }
+
+    #[test]
+    fn test_decbc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.c = 0;
+        cpu.decbc();
+        assert_eq!(0, cpu.b);
+        assert_eq!(255, cpu.c);
+        cpu.c = 0;
+        cpu.b = 0;
+        cpu.decbc();
+        assert_eq!(255, cpu.b);
+        assert_eq!(255, cpu.c);
+        cpu.decbc();
+        assert_eq!(255, cpu.b);
+        assert_eq!(254, cpu.c);
+        Ok(())
+    }
+
+    #[test]
+    fn test_scf() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x37);
+        assert_eq!(true, cpu.get_flag_c());
+        assert_eq!(false, cpu.get_flag_h());
+        assert_eq!(false, cpu.get_flag_n());
+        cpu.f = 0xff;
+        cpu.run_opcode(0x37);
+        assert_eq!(true, cpu.get_flag_c());
+        assert_eq!(false, cpu.get_flag_h());
+        assert_eq!(false, cpu.get_flag_n());
+        Ok(())
+    }
+
+    #[test]
+    fn test_cpl() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.run_opcode(0x2f);
+        assert_eq!(cpu.a, 0xff - 0x07);
+        Ok(())
+    }
+
+    #[test]
+    fn test_ccf() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        assert_eq!(cpu.get_flag_c(), false);
+        cpu.run_opcode(0x3f);
+        assert_eq!(cpu.get_flag_c(), true);
+        cpu.run_opcode(0x3f);
+        assert_eq!(cpu.get_flag_c(), false);
+        cpu.f = 0xff;
+        cpu.run_opcode(0x3f);
+        assert_eq!(cpu.f, 0x8f);
+        Ok(())
+    }
+
     #[test]
     fn test_get_from_reg() -> Result<(), String> {
         let mut cpu = get_cpu();
@@ -669,8 +1046,6 @@ mod tests {
         assert_eq!(cpu.a, 0);
         Ok(())
     }
-
-
 
     #[test]
     fn test_ld_from_cardridge() -> Result<(), String> {
@@ -884,7 +1259,4 @@ mod tests {
         assert_eq!(cpu.a, 0x81);
         Ok(())
     }
-
-
-
 }
