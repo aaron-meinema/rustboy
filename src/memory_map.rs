@@ -32,7 +32,7 @@ impl MemoryMap {
     pub fn get_8bit_full_address(&self, memory_location: usize) -> u8 {
         match memory_location {
             0xff00      => return self.get_joypad(),
-            _           => return self.memory.get(memory_location).unwrap().clone()
+            _           => return *self.memory.get(memory_location).unwrap()
         } 
     }
 
