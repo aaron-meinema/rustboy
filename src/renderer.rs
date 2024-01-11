@@ -153,7 +153,13 @@ impl Renderer {
                 screen.push(clr_position);
             }
         }
-        let oke = self.get_sprites_from_screen();
+        let colors_from_sprite = self.get_sprites_from_screen();
+        for pixel in colors_from_sprite {
+            if !pixel.color.eq(&Color::WHITE) {
+                screen.push(pixel);
+            }
+        }
+
         screen
     }
 
@@ -161,9 +167,9 @@ impl Renderer {
         let eight_by_sixteen = self.get_object_size();
         let mut screen: Vec<ColorPosition> = Vec::new();
         let sprites = self.get_all_sprites();
-        for y in 0..=HEIGHT {
+        for y in -16..=HEIGHT {
             let mut pixel_count = 0;
-            for x in 0..=WIDTH {
+            for x in -8..=WIDTH {
                 let found_sprites: Vec<&Sprite> = sprites
                     .iter()
                     .filter(|sprite| sprite.compare_bool(x, y, eight_by_sixteen))
@@ -220,6 +226,7 @@ impl Renderer {
         let x = i32::from(self.oam_data[oam_offset]) - 8;
         let y = i32::from(self.oam_data[oam_offset + 1]) - 16;
         let tile = self.convert_tile(tile);
+
         let flags = self.oam_data[oam_offset + 3];
 
         Sprite::new(x, y, tile, flags)
