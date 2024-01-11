@@ -22,7 +22,7 @@ pub fn main() {
     };
     let mut cpu = cpu::Cpu::new(cardridge);
 
-    cpu.start_cycle();
+    cpu.start_cycle();//70224 clocks then render a new frame
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let mut window = video_subsystem.window("rust-sdl2 demo",width * settings.render_scale, height * settings.render_scale)
