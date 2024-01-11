@@ -39,16 +39,15 @@ impl Sprite {
         Sprite { x, y, tile, flags }
     }
 
-    fn compare(&self, x: i32, y: i32, eight_by_sixteen: bool) -> Ordering {
-        let y_size = if eight_by_sixteen { 16 } else { 8 };
-        if self.x <= x && self.x + 8 > x && self.y <= y && self.y + y_size > y {
-            Ordering::Equal
-        } else if self.x < x {
-            Ordering::Greater
-        } else if self.x == x && self.y < y {
-            Ordering::Greater
-        } else {
+    fn compare(&self, x: i32, y: i32, compare_sprite: &Sprite) -> Ordering {
+        if self.get_pixel(x, y).eq(&Color::WHITE) {
             Ordering::Less
+        } 
+        else if self.x > compare_sprite.x {
+            Ordering::Less
+        }
+        else {
+            Ordering::Greater
         }
     }
 
@@ -162,9 +161,9 @@ impl Renderer {
         let eight_by_sixteen = self.get_object_size();
         let mut screen: Vec<ColorPosition> = Vec::new();
         let sprites = self.get_all_sprites();
-        for y in -16..=HEIGHT {
+        for y in 0..=HEIGHT {
             let mut pixel_count = 0;
-            for x in -8..=WIDTH {
+            for x in 0..=WIDTH {
                 let found_sprites: Vec<&Sprite> = sprites
                     .iter()
                     .filter(|sprite| sprite.compare_bool(x, y, eight_by_sixteen))
@@ -179,7 +178,10 @@ impl Renderer {
                 if x < 0 || y < 0 {
                     continue;
                 }
-                let sprite = sprites.iter().min_by(|x, y| x.x.cmp(&y.x)).unwrap();
+                let sprite = *found_sprites
+                                    .iter()
+                                    .max_by(|s1, s2| s1.compare(x, y, *s2))
+                                    .unwrap();
                 screen.push(ColorPosition::new(x, y, sprite.get_pixel(x, y)));
             }
         }
@@ -215,7 +217,6 @@ impl Renderer {
     fn get_sprite(&self, number: usize) -> Sprite {
         let oam_offset = number * 4;
         let tile = self.get_tile(<u8 as Into<usize>>::into(self.oam_data[oam_offset + 2]) + 0x8000);
-        let extra = i32::try_from(number).unwrap();
         let x = i32::from(self.oam_data[oam_offset]) - 8;
         let y = i32::from(self.oam_data[oam_offset + 1]) - 16;
         let tile = self.convert_tile(tile);
