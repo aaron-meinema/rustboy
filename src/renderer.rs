@@ -1,6 +1,7 @@
+use sdl2::libc::MAP_SHARED;
 use sdl2::pixels::Color;
 use std::cmp::Ordering;
-use std::fmt::Debug;
+use std::fmt::{Debug, Error};
 
 pub const WIDTH: i32 = 160;
 pub const HEIGHT: i32 = 144;
@@ -11,7 +12,6 @@ pub struct Renderer {
     oam_data: [u8; 0xfea0 - 0xfe00],
     lcdc: u8,
     color: [Color; 4],
-    transparent: Color,
 }
 #[derive(Debug)]
 pub struct ColorPosition {
@@ -120,7 +120,6 @@ impl Renderer {
                 Color::RGB(105, 105, 105),
                 Color::BLACK,
             ],
-            transparent: Color::RGBA(0, 0, 0, 0),
         };
 
         renderer.get_all_sprites();
@@ -142,15 +141,20 @@ impl Renderer {
     pub fn get_screen(&self) -> Vec<ColorPosition> {
         let mut screen: Vec<ColorPosition> = Vec::new();
         let background = self.get_background();
+        let window = self.get_window();
         for y in 0..=HEIGHT {
             for x in 0..=WIDTH {
                 let tile: Tile =
                     background[usize::try_from(y / 8).unwrap()][usize::try_from(x / 8).unwrap()];
                 let color =
                     tile.pixels[usize::try_from(y % 8).unwrap()][usize::try_from(x % 8).unwrap()];
-                let clr_position = ColorPosition { y, x, color };
-
-                screen.push(clr_position);
+                
+                let window_pixel = self.get_window_pixel(window, y, x);
+                let color_position = match window_pixel {
+                    Ok(pixel) => pixel,
+                    Err(_) => ColorPosition { y, x, color }
+                };
+                screen.push(color_position);
             }
         }
         let colors_from_sprite = self.get_sprites_from_screen();
@@ -161,6 +165,12 @@ impl Renderer {
         }
 
         screen
+    }
+
+    fn get_window_pixel(&self, window: [[Tile; 32]; 32], y: i32, x: i32) -> Result<ColorPosition, Error> {
+        let tile: Tile = window[usize::try_from(y / 8).unwrap()][usize::try_from(x / 8).unwrap()];
+        let color = tile.pixels[usize::try_from(y % 8).unwrap()][usize::try_from(x % 8).unwrap()];
+        Ok(ColorPosition { y, x, color })
     }
 
     fn get_sprites_from_screen(&self) -> Vec<ColorPosition> {
@@ -220,6 +230,23 @@ impl Renderer {
         background
     }
 
+    fn get_window(&self) -> [[Tile; 32]; 32] {
+        let data_area = self.get_background_tile_data_area();
+        let map_area = self.get_window_tile_map_area();
+        let map_index = if map_area { 0x9800 } else { 0x9c00 };
+        let data_index: usize = if data_area { 0x8000 } else { 0x8800 };
+        let mut window: [[Tile; 32]; 32] = [[Tile::new(); 32]; 32];
+        for i in 0..0x300 {
+            let tile_number: usize = usize::from(self.get_byte_from_location(i + map_index));
+            let tile_data = self.get_tile(tile_number * 16 + data_index);
+            let x = i % 32;
+            let y = i / 32;
+            window[y][x] = self.convert_tile(tile_data);
+        }
+
+        window
+    }
+
     fn get_sprite(&self, number: usize) -> Sprite {
         let oam_offset = number * 4;
         let tile = self.get_tile(<u8 as Into<usize>>::into(self.oam_data[oam_offset + 2]) + 0x8000);
@@ -246,6 +273,11 @@ impl Renderer {
     fn get_background_tile_map_area(&self) -> bool {
         let num = self.lcdc & 0x8;
         num == 0x8
+    }
+
+    fn get_window_tile_map_area(&self) -> bool {
+        let num = self.lcdc & 0x40;
+        num == 0x40
     }
 
     /// get background tile data area FALSE is area 0 TRUE is area 1
