@@ -68,6 +68,7 @@ impl Cpu {
             0x02         => self.ldbca(),
             0x03         => self.incbc(),
             0x07         => self.rcla(),
+            0x09         => self.add_hl_bc(),
             0x0f         => self.rrca(),
             0x0b         => self.decbc(),
             0x10         => self.stop(),
@@ -75,17 +76,20 @@ impl Cpu {
             0x12         => self.lddea(),
             0x13         => self.incde(),
             0x17         => self.rla(),
+            0x19         => self.add_hl_de(),
             0x1f         => self.rra(),
             0x1b         => self.decde(),
             0x21         => self.ld_hl(),
             0x22         => self.ldhlp(),
             0x23         => self.inchl(),
             0x27         => self.daa(),
+            0x29         => self.add_hl_hl(),
             0x2b         => self.dechl(),
             0x2f         => self.cpl(),
             0x31         => self.ld_sp(),
             0x32         => self.ldhlm(),
             0x33         => self.incsp(),
+            0x39         => self.add_hl_sp(),
             0x3b         => self.decsp(),
             0x3f         => self.ccf(),
             0x0a         => self.ldabc(),
@@ -154,6 +158,37 @@ impl Cpu {
             self.set_flag_c(true);
         }
         self.cycle_counter +=4;
+    }
+
+    fn add_hl_16bit(&mut self, number: u16) {
+        let hl = self.get_hl();
+        let high = number >> 8;
+        let overflow = hl.overflowing_add(number);
+        self.set_flag_h_pos(self.h, high.try_into().unwrap());
+        self.set_flag_c(overflow.1);
+        self.set_flag_n(false);
+        self.set_hl(overflow.0);
+        self.cycle_counter += 8;
+        self.memory_counter += 1;
+    }
+
+    fn add_hl_bc(&mut self) {
+        let bc = self.get_bc();
+        self.add_hl_16bit(bc);
+    }
+
+    fn add_hl_de(&mut self) {
+        let de = self.get_de();
+        self.add_hl_16bit(de);
+    }
+
+    fn add_hl_hl(&mut self) {
+        let hl = self.get_hl();
+        self.add_hl_16bit(hl);
+    }
+
+    fn add_hl_sp(&mut self) {
+        self.add_hl_16bit(self.stack_counter);        
     }
 
     fn rcla(&mut self) {
@@ -754,6 +789,13 @@ impl Cpu {
         return h + l;
     }
 
+    fn set_hl(&mut self, hl: u16) {
+        let high = hl >> 8;
+        let low = hl & 0x00ff;
+        self.h = high.try_into().unwrap();
+        self.l = low.try_into().unwrap();
+    }
+
     fn nop(&mut self) {
         self.cycle_counter += 4;
         self.memory_counter += 1;
@@ -795,6 +837,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_add_16bit() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.set_hl(0x1234);
+        cpu.b = 0xff;
+        cpu.c = 0;
+        cpu.run_opcode(0x09);
+        assert!(cpu.get_flag_h());
+        assert!(cpu.get_flag_c());
+        assert!(!cpu.get_flag_n());
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_hl() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.set_hl(0x1234);
+        assert_eq!(cpu.h, 0x12);
+        assert_eq!(cpu.l, 0x34);
+
+        Ok(())
+    }
     #[test]
     fn test_rrca() -> Result<(), String> {
         let mut cpu = get_cpu();
