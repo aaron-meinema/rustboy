@@ -1,5 +1,5 @@
 use sdl2::libc::OVERLAYFS_SUPER_MAGIC;
-use serde::de::value::Error;
+use serde::de::value::{Error, self};
 
 use crate::cardridge::Cardridge;
 use crate::memory_map::MemoryMap;
@@ -125,7 +125,9 @@ impl Cpu {
         let opcode = self.get_from_cardridge();
         match opcode {
             0x00..=0x07 => self.rlc(opcode),
+            0x08..=0x0f => self.rrc(opcode),
             _=> self.default(opcode),
+
         }
         self.cycle_counter += 4;
     }
@@ -148,6 +150,27 @@ impl Cpu {
         self.set_flag_z_value(result);
  
         self.cycle_counter +=4; 
+    }
+
+    fn rrc(&mut self, opcode: u8) {
+        self.memory_counter += 1;
+        let register = u8::from(opcode & CPU_FIRST);
+        let mut value_from_reg = self.get_value_from_register(register);
+
+        let result = value_from_reg & 1;
+
+        value_from_reg = value_from_reg >> 1;
+        if result == 1 {
+            self.set_flag_c(true);
+            value_from_reg += 0x80;
+        }
+        self.store_value_into_register(value_from_reg, register);
+
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z_value(value_from_reg);
+ 
+        self.cycle_counter +=4;
     }
 
     fn rrca(&mut self) {
@@ -894,6 +917,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_rrc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.rrc(0);
+        assert_eq!(0x80, cpu.b);
+        Ok(())
+    }
+    
     #[test]
     fn test_rlc() -> Result<(), String> {
         let mut cpu = get_cpu();
