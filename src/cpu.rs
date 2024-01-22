@@ -23,7 +23,6 @@ pub struct Cpu {
 
 const CPU_FIRST: u8  = 0b0000_0111;
 const CPU_SECOND: u8 = 0b0011_1000;
-
 impl Cpu {
     pub fn new(the_cardridge: Cardridge) -> Cpu {
         let cpu = Cpu {
@@ -97,6 +96,7 @@ impl Cpu {
             0x3a         => self.ldahlm(),
             0x3b         => self.decsp(),
             0x3f         => self.ccf(),
+            0xcb         => self.prefix_cb(),
             0xe0         => self.ld_to_memory(),
             0xe2         => self.ld_to_memory_c(),
             0xea         => self.ld_a16_a(),
@@ -118,6 +118,31 @@ impl Cpu {
             _ => self.default(opcode),
 
         }
+    }
+
+    fn prefix_cb(&mut self) {
+        self.memory_counter += 1;
+        let opcode = self.get_from_cardridge();
+        match opcode {
+            0x00..=0x07 => self.rlc(opcode),
+            _=> self.default(opcode),
+        }
+        self.cycle_counter += 4;
+    }
+
+    fn rlc(&mut self, opcode: u8) {
+        self.memory_counter += 1;
+        let register = u8::from(opcode & CPU_FIRST);
+        let mut value_from_reg = self.get_value_from_register(register);
+        let result = value_from_reg >> 7;
+
+        value_from_reg = value_from_reg << 1;
+        if result == 1 {
+            self.set_flag_c(true);
+            value_from_reg += 1;
+        }
+        self.store_value_into_register(value_from_reg, register);
+        self.cycle_counter +=4; 
     }
 
     fn rrca(&mut self) {
@@ -493,7 +518,7 @@ impl Cpu {
 
     fn sub(&mut self, opcode: u8) {
         let register = u8::from(opcode & CPU_FIRST);
-        let value_from_reg = self.get_value_from_register(register);
+        let value_from_reg: u8 = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_sub(value_from_reg);
         self.set_flag_z(value_overflow.0);
         self.set_flag_n(true);
@@ -835,6 +860,14 @@ mod tests {
             stopped: false,
             memory_map: MemoryMap::new(cardridge)
         }
+    }
+
+    #[test]
+    fn test_rlc() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.rlc(0);
+        assert_eq!(2, cpu.b);
+        Ok(())
     }
 
     #[test]
