@@ -142,6 +142,11 @@ impl Cpu {
             value_from_reg += 1;
         }
         self.store_value_into_register(value_from_reg, register);
+
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z_value(result);
+ 
         self.cycle_counter +=4; 
     }
 
@@ -154,6 +159,11 @@ impl Cpu {
             self.set_flag_c(true);
             self.a += 0x80;
         }
+
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z(false);
+ 
         self.cycle_counter +=4;
     }
 
@@ -168,6 +178,11 @@ impl Cpu {
         if result == 1 {
             self.set_flag_c(true);
         }
+
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z(false);
+ 
         self.cycle_counter +=4;
     }
 
@@ -181,7 +196,11 @@ impl Cpu {
         }
         if result == 1 {
             self.set_flag_c(true);
-        }
+        }        
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z(false);
+ 
         self.cycle_counter +=4;
     }
 
@@ -190,6 +209,7 @@ impl Cpu {
         let high = number >> 8;
         let overflow = hl.overflowing_add(number);
         self.set_flag_h_pos(self.h, high.try_into().unwrap());
+        self.set_flag_n(false);
         self.set_flag_c(overflow.1);
         self.set_flag_n(false);
         self.set_hl(overflow.0);
@@ -219,12 +239,15 @@ impl Cpu {
     fn rcla(&mut self) {
         self.memory_counter += 1;
         let result = self.a >> 7;
-
         self.a = self.a << 1;
         if result == 1 {
             self.set_flag_c(true);
             self.a += 1;
         }
+
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z(false); 
         self.cycle_counter +=4;
     }
 
@@ -520,7 +543,7 @@ impl Cpu {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg: u8 = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_sub(value_from_reg);
-        self.set_flag_z(value_overflow.0);
+        self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(true);
         self.set_flag_h_neg(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
@@ -533,7 +556,7 @@ impl Cpu {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_sub(value_from_reg + self.get_c_value());
-        self.set_flag_z(value_overflow.0);
+        self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(true);
         self.set_flag_h_neg(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
@@ -546,7 +569,7 @@ impl Cpu {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_add(value_from_reg);
-        self.set_flag_z(value_overflow.0);
+        self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(false);
         self.set_flag_h_pos(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
@@ -559,7 +582,7 @@ impl Cpu {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_add(value_from_reg + self.get_c_value());
-        self.set_flag_z(value_overflow.0);
+        self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(false);
         self.set_flag_h_pos(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
@@ -574,7 +597,7 @@ impl Cpu {
         self.a = self.a & value_from_reg;
 
         self.f = 0x20;
-        self.set_flag_z(self.a);
+        self.set_flag_z_value(self.a);
     }
 
     fn xor(&mut self, opcode: u8) {
@@ -582,7 +605,7 @@ impl Cpu {
         let value_from_reg = self.get_value_from_register(register);
         self.a = self.a ^ value_from_reg;
         self.f = 0;
-        self.set_flag_z(self.a);
+        self.set_flag_z_value(self.a);
     }
 
     fn or(&mut self, opcode: u8) {
@@ -590,14 +613,14 @@ impl Cpu {
         let value_from_reg = self.get_value_from_register(register);
         self.a = self.a | value_from_reg;
         self.f = 0x20;
-        self.set_flag_z(self.a);
+        self.set_flag_z_value(self.a);
     }
 
     fn cp(&mut self, opcode: u8) {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
         let value_overflow = self.a.overflowing_sub(value_from_reg);
-        self.set_flag_z(value_overflow.0);
+        self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(true);
         self.set_flag_h_neg(self.a, value_from_reg);
         self.set_flag_c(value_overflow.1);
@@ -609,7 +632,7 @@ impl Cpu {
         let register = u8::from(opcode & CPU_SECOND);
         let value = self.get_value_from_register(register);
         let overflow = value.overflowing_add(1);
-        self.set_flag_z(overflow.0);
+        self.set_flag_z_value(overflow.0);
         self.set_flag_n(false);
         self.set_flag_h_pos(value, 1);
         self.store_value_into_register(overflow.0, register);
@@ -621,7 +644,7 @@ impl Cpu {
         let register = u8::from(opcode & CPU_SECOND);
         let value = self.get_value_from_register(register);
         let overflow = value.overflowing_sub(1);
-        self.set_flag_z(overflow.0);
+        self.set_flag_z_value(overflow.0);
         self.set_flag_n(true);
         self.set_flag_h_neg(value, 1);
         self.store_value_into_register(overflow.0, register);
@@ -655,12 +678,21 @@ impl Cpu {
                 overflow |= result.1;
             }
         }
-        self.set_flag_z(self.a);
+        self.set_flag_z_value(self.a);
         self.set_flag_c(overflow);
         self.set_flag_h(false);
     }
 
-    fn set_flag_z(&mut self, result: u8) {
+    fn set_flag_z(&mut self, set: bool) {
+        if set {
+            self.f |= 0x80;
+        }
+        else {
+            self.f &= 0x7f;
+        }
+    }
+
+    fn set_flag_z_value(&mut self, result: u8) {
         if result == 0 {
             self.f |= 0x80;
         }
