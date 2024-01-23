@@ -126,10 +126,32 @@ impl Cpu {
         match opcode {
             0x00..=0x07 => self.rlc(opcode),
             0x08..=0x0f => self.rrc(opcode),
+            0x10..=0x17 => self.rl(opcode),
             _=> self.default(opcode),
 
         }
         self.cycle_counter += 4;
+    }
+    fn rl(&mut self, opcode: u8) {
+        self.memory_counter += 1;
+        let register = u8::from(opcode & CPU_FIRST);
+        let mut value_from_reg = self.get_value_from_register(register);
+ 
+        let result = value_from_reg >> 7;
+        
+        value_from_reg = value_from_reg << 1;
+        if self.get_flag_c() {
+            value_from_reg += 1;
+        }
+        if result == 1 {
+            self.set_flag_c(true);
+        }        
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z_value(value_from_reg);
+        
+        self.store_value_into_register(value_from_reg, register);
+        self.cycle_counter +=4;
     }
 
     fn rlc(&mut self, opcode: u8) {
@@ -916,7 +938,21 @@ mod tests {
             memory_map: MemoryMap::new(cardridge)
         }
     }
+    #[test]
+    fn test_rl() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.b=1;
+        cpu.rl(0);
+        assert_eq!(2, cpu.b);
+        assert!(!cpu.get_flag_c());
+        cpu.b =0xff;
+        cpu.rl(0);
+        assert_eq!(0xfe, cpu.b);
+        assert!(cpu.get_flag_c());
 
+        Ok(())
+    }
+ 
     #[test]
     fn test_rrc() -> Result<(), String> {
         let mut cpu = get_cpu();
@@ -924,7 +960,7 @@ mod tests {
         assert_eq!(0x80, cpu.b);
         Ok(())
     }
-    
+
     #[test]
     fn test_rlc() -> Result<(), String> {
         let mut cpu = get_cpu();
