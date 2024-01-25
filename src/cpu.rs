@@ -129,10 +129,34 @@ impl Cpu {
             0x10..=0x17 => self.rl(opcode),
             0x18..=0x1f => self.rr(opcode),
             0x20..=0x27 => self.sla(opcode),
+            0x28..=0x2f => self.sra(opcode),
             _=> self.default(opcode),
 
         }
         self.cycle_counter += 4;
+    }
+
+    fn sra(&mut self, opcode: u8) {
+        self.memory_counter += 1;
+        let register = u8::from(opcode & CPU_FIRST);
+        let mut value_from_reg = self.get_value_from_register(register);
+ 
+        let old_bit7 = value_from_reg >> 7;
+        let result = value_from_reg & 1;
+        
+        value_from_reg = value_from_reg >> 1;
+        if result == 1 {
+            self.set_flag_c(true);
+        }        
+
+        value_from_reg = value_from_reg + (old_bit7 << 7);
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.set_flag_z_value(value_from_reg);
+        
+        self.store_value_into_register(value_from_reg, register);
+        self.cycle_counter +=4;
+ 
     }
 
     fn sla(&mut self, opcode: u8) {
@@ -985,6 +1009,18 @@ mod tests {
             memory_map: MemoryMap::new(cardridge)
         }
     }
+
+    #[test]
+    fn test_sra() -> Result<(), String> {
+        let mut cpu = get_cpu();
+        cpu.b=0xff;
+        cpu.sra(0);
+        assert_eq!(0xff, cpu.b);
+        assert!(cpu.get_flag_c());
+        Ok(())
+    }
+ 
+
     #[test]
     fn test_rr() -> Result<(), String> {
         let mut cpu = get_cpu();
