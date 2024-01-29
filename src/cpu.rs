@@ -25,7 +25,7 @@ const CPU_FIRST: u8  = 0b0000_0111;
 const CPU_SECOND: u8 = 0b0011_1000;
 impl Cpu {
     pub fn new(the_cardridge: Cardridge) -> Cpu {
-        let cpu = Cpu {
+        let mut cpu = Cpu {
             b: 0,
             c: 0,
             d: 0,
@@ -41,6 +41,7 @@ impl Cpu {
             stopped: false,
             memory_map: MemoryMap::new(the_cardridge),
         };
+        cpu.init();
         cpu
     }
 
@@ -54,6 +55,10 @@ impl Cpu {
                 self.run_opcode(number);
             }
         }
+    }
+
+    fn init(&mut self) {
+        self.memory_map.store_8bit_full_address(0xff00, 0x30);
     }
 
     fn get_from_cardridge(&mut self) -> u8 {

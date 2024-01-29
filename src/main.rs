@@ -99,7 +99,6 @@ pub fn main() {
     };
     
     let mut cpu = cpu::Cpu::new(cardridge);
-    cpu.memory_map.store_8bit_full_address(0xff00, 0x30);
 
     let mut buttons: u8 = 0x0f;
     let mut d_pad: u8 = 0x0f;
