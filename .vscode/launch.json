@@ -6,7 +6,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "${fileDirname}/../target/debug/rustboy",
-            "args": [],
+            "args": ["06-ld r,r.gb"],
             "cwd": "${workspaceRoot}",
             "sourceLanguages": [
                 "rust"

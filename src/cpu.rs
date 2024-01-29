@@ -14,7 +14,7 @@ pub struct Cpu {
     a: u8,  // 111
 
     f: u8,
-    cycle_counter: u16,
+    cycle_counter: usize,
     memory_counter: usize,
     stack_counter: u16,
     stopped: bool,
@@ -49,7 +49,12 @@ impl Cpu {
         if !self.stopped {
             loop {
                 if self.memory_counter >= self.memory_map.cardridge.memory.len().try_into().unwrap() {
+                    // create support for this
                     return
+                }
+                if self.cycle_counter >=  69905 {
+                    self.cycle_counter = 0;
+                    return;
                 }
                 let number = self.get_from_cardridge();
                 self.run_opcode(number);
@@ -578,12 +583,10 @@ impl Cpu {
     }
 
     fn ldahlp(&mut self) {
-        if self.l == 0xff {
-            self.l = 0x00;
-            self.h += 1;
-        }
-        else {
-            self.l += 1;
+        let over = self.l.overflowing_add(1);
+        self.l = over.0;
+        if over.1 {
+            self.h = self.h.overflowing_add(1).0;
         }
         let location = self.get_hl();
         self.a = self.memory_map.get_8bit_full_address(location.into());
@@ -592,12 +595,10 @@ impl Cpu {
     }
 
     fn ldahlm(&mut self) {
-        if self.l == 0x00 {
-            self.l = 0xff;
-            self.h -= 1;
-        }
-        else {
-            self.l -= 1;
+        let over = self.l.overflowing_sub(1);
+        self.l = over.0;
+        if over.1 {
+            self.h = self.h.overflowing_sub(1).0;
         }
         let location = self.get_hl();
         self.a = self.memory_map.get_8bit_full_address(location.into());
@@ -676,7 +677,8 @@ impl Cpu {
     fn sbc(&mut self, opcode: u8) {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
-        let value_overflow = self.a.overflowing_sub(value_from_reg + self.get_c_value());
+        let save_carry = value_from_reg.overflowing_add(self.get_c_value());
+        let value_overflow = self.a.overflowing_sub(save_carry.0);
         self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(true);
         self.set_flag_h_neg(self.a, value_from_reg);
@@ -702,7 +704,8 @@ impl Cpu {
     fn adc(&mut self, opcode: u8) {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
-        let value_overflow = self.a.overflowing_add(value_from_reg + self.get_c_value());
+        let save_carry = value_from_reg.overflowing_add(self.get_c_value());
+        let value_overflow = self.a.overflowing_add(save_carry.0);
         self.set_flag_z_value(value_overflow.0);
         self.set_flag_n(false);
         self.set_flag_h_pos(self.a, value_from_reg);
@@ -716,9 +719,13 @@ impl Cpu {
         let register = u8::from(opcode & CPU_FIRST);
         let value_from_reg = self.get_value_from_register(register);
         self.a = self.a & value_from_reg;
-
         self.f = 0x20;
         self.set_flag_z_value(self.a);
+        self.set_flag_c(false);
+        self.set_flag_h(true);
+        self.set_flag_n(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn xor(&mut self, opcode: u8) {
@@ -727,6 +734,11 @@ impl Cpu {
         self.a = self.a ^ value_from_reg;
         self.f = 0;
         self.set_flag_z_value(self.a);
+        self.set_flag_c(false);
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn or(&mut self, opcode: u8) {
@@ -735,6 +747,11 @@ impl Cpu {
         self.a = self.a | value_from_reg;
         self.f = 0x20;
         self.set_flag_z_value(self.a);
+        self.set_flag_c(false);
+        self.set_flag_h(false);
+        self.set_flag_n(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn cp(&mut self, opcode: u8) {
@@ -802,6 +819,8 @@ impl Cpu {
         self.set_flag_z_value(self.a);
         self.set_flag_c(overflow);
         self.set_flag_h(false);
+        self.memory_counter += 1;
+        self.cycle_counter += 4;
     }
 
     fn set_flag_z(&mut self, set: bool) {
@@ -897,6 +916,7 @@ impl Cpu {
 
     fn default(&mut self, byte: u8) {
         self.a = byte;
+        println!("{:#04X?}", byte);
         self.memory_counter += 1;
         self.cycle_counter += 1;
     }
@@ -982,8 +1002,7 @@ impl Cpu {
     fn stop(&mut self) {
         self.cycle_counter += 4;
         self.memory_counter += 2;
-        self.stopped = true;
-        !todo!("make renderer and others also stop")
+        //self.stopped = true;
     }
 }
 
