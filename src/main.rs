@@ -14,6 +14,9 @@ use sdl2::render::{TextureCreator, Canvas};
 use sdl2::video::{WindowContext, Window};
 use settings::Settings;
 
+use std::env;
+use std::fs::File;
+use std::io::Read;
 use std::time::Duration;
 // handle the annoying Rect i32
 macro_rules! rect(
@@ -90,14 +93,29 @@ impl Sdl2Helper {
     
 
 }
-
+fn get_rom() -> Vec<u8> {
+    let args: Vec<String> = env::args().collect();
+    let binding = "default".to_string();
+    let arg = args.get(1).unwrap_or(&binding);
+    let mut buffer: Vec<u8> = Vec::new();
+    if arg.eq("default") {
+        return vec![0x40, 0x41, 0x42];
+    }
+    let file = File::open(arg);
+    match file {
+        Ok(mut val) => {
+            let _ = val.read_to_end(&mut buffer);
+            return buffer;
+        },
+        Err(_) => return vec![0x40, 0x41, 0x42],
+    }
+}
 pub fn main() {
-    let vec1:Vec<u8> = vec![0x40, 0x41, 0x42];    
+    let vec1:Vec<u8> = get_rom();
     let mut sdl_help = Sdl2Helper::new();
     let cardridge = cardridge::Cardridge{
         memory: vec1,
     };
-    
     let mut cpu = cpu::Cpu::new(cardridge);
 
     let mut buttons: u8 = 0x0f;
@@ -107,7 +125,8 @@ pub fn main() {
     'running: loop {
         sdl_help.add_debug_message(format!("{:#04x}", &cpu.memory_map.get_8bit_full_address(0xff00)).as_str().to_string());
         sdl_help.add_debug_message("hello world".to_owned());
-        
+        cpu.start_cycle();
+
         sdl_help.canvas.clear();
         sdl_help.canvas.set_draw_color(Color::RGB(0, 0, 0));
         let render = cpu.memory_map.renderer.get_screen();
